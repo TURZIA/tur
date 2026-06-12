@@ -1077,13 +1077,17 @@ async function registerPosition() {
 
     // Supabase
     if (navigator.onLine && sbClient) {
-      try {
-        // Sikre at løperen finnes i runners-tabellen før innsjekking
-        await saveRunnerToSupabase(runner.id, runner.name);
-        await saveCheckInToSupabase(entry);
-      } catch (e) {
-        console.error('Supabase-feil:', e);
-        showToast('⚠️ Nettverksfeil — lagret lokalt', 't-warn');
+      if (!sbClient) {
+        showToast('❌ Supabase ikke tilkoblet', 't-error', 6000);
+      } else {
+        try {
+          await saveRunnerToSupabase(runner.id, runner.name);
+          await saveCheckInToSupabase(entry);
+        } catch (e) {
+          const msg = e?.message || e?.error_description || JSON.stringify(e) || 'ukjent';
+          showToast('❌ ' + msg, 't-error', 8000);
+          console.error('Supabase-feil:', e);
+        }
       }
     } else {
       showToast('📵 Offline — lagret lokalt', 't-warn');
