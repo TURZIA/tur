@@ -598,9 +598,11 @@ async function fetchRunnerHistory(runnerId) {
 /* ============================================================
    LOCAL STORAGE
    ============================================================ */
-const LS_RUNNER = 'loypesjekk_runner';
-const LS_LOG    = 'loypesjekk_log';
-const LS_IOS    = 'loypesjekk_ios_dismissed';
+const LS_RUNNER   = 'loypesjekk_runner';
+const LS_LOG      = 'loypesjekk_log';
+const LS_IOS      = 'loypesjekk_ios_dismissed';
+const LS_LAST_REG = 'loypesjekk_last_registration'; // وقت آخر تسجيل
+const COOLDOWN_MS = 60 * 60 * 1000; // ساعة واحدة بالميلي ثانية
 
 const getRunner    = () => { try { return JSON.parse(localStorage.getItem(LS_RUNNER)); } catch { return null; } };
 const saveRunner   = r  => localStorage.setItem(LS_RUNNER, JSON.stringify(r));
@@ -917,6 +919,16 @@ async function registerPosition() {
   const btn = document.getElementById('registerBtn');
   if (btn.classList.contains('btn-gray')) return; // بعيد عن النقطة — لا تسجّل
 
+  // تحقق من الكولداون — ساعة كاملة بين كل تسجيلين
+  const lastReg = parseInt(localStorage.getItem(LS_LAST_REG) || '0', 10);
+  const elapsed = Date.now() - lastReg;
+  if (elapsed < COOLDOWN_MS) {
+    const remaining = COOLDOWN_MS - elapsed;
+    const mins = Math.ceil(remaining / 60000);
+    showToast(`⏳ Vent ${mins} minutt${mins !== 1 ? 'er' : ''} før neste registrering`, 't-warn', 5000);
+    return;
+  }
+
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div>';
 
@@ -983,6 +995,7 @@ async function registerPosition() {
     }
 
     appendLocalLog(entry);
+    localStorage.setItem(LS_LAST_REG, Date.now().toString());
 
     // تلوين النقطة على الخريطة
     if (nearestCp) markCheckpointDone(nearestCp.order);
