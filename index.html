@@ -189,16 +189,7 @@
       position: relative;
       overflow: hidden;
     }
-    #map {
-      width: 100%; height: 100%;
-      transition: transform 0.3s ease-out;
-      transform-origin: center center;
-    }
-    /* counter-rotate controls so they stay upright */
-    #map .leaflet-control-zoom,
-    #map .leaflet-control-attribution {
-      transition: transform 0.3s ease-out;
-    }
+    #map { width: 100%; height: 100%; }
 
     /* Leaflet overrides */
     .leaflet-control-attribution { font-size: 9px !important; }
@@ -1297,58 +1288,7 @@ function updateCompass(lat, lng) {
     .addTo(leafletMap);
 }
 
-/* ============================================================
-   MAP ROTATION based on device compass heading
-   ============================================================ */
-let mapHeading = 0;
-let mapRotateEnabled = false;
-
-function applyMapRotation(deg) {
-  mapHeading = deg;
-  const mapEl = document.getElementById('map');
-  if (!mapEl) return;
-  mapEl.style.transform = `rotate(${-deg}deg)`;
-  // counter-rotate controls
-  mapEl.querySelectorAll('.leaflet-control-zoom, .leaflet-control-attribution')
-    .forEach(el => { el.style.transform = `rotate(${deg}deg)`; });
-}
-
-function initCompass() {
-  const handler = (e) => {
-    let heading = null;
-    if (e.webkitCompassHeading != null) {
-      heading = e.webkitCompassHeading;          // iOS
-    } else if (e.absolute && e.alpha != null) {
-      heading = (360 - e.alpha) % 360;           // Android absolute
-    } else if (e.alpha != null) {
-      heading = (360 - e.alpha) % 360;
-    }
-    if (heading !== null) {
-      mapRotateEnabled = true;
-      applyMapRotation(heading);
-    }
-  };
-
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission === 'function') {
-    // iOS 13+ يحتاج إذن — نطلبه بعد تفاعل المستخدم
-    const btn = document.createElement('button');
-    btn.textContent = '🧭 تفعيل البوصلة';
-    btn.className = 'btn btn-green';
-    btn.style.cssText = 'position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:1000;font-size:0.8rem;padding:8px 16px;';
-    document.getElementById('mapContainer').appendChild(btn);
-    btn.addEventListener('click', () => {
-      DeviceOrientationEvent.requestPermission().then(s => {
-        if (s === 'granted') {
-          window.addEventListener('deviceorientation', handler, true);
-          btn.remove();
-        }
-      }).catch(() => btn.remove());
-    });
-  } else if (typeof DeviceOrientationEvent !== 'undefined') {
-    window.addEventListener('deviceorientation', handler, true);
-  }
-}
+function initCompass() {}
 
 /* ============================================================
    FORMAT ELAPSED
