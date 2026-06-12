@@ -1078,9 +1078,11 @@ async function registerPosition() {
     // Supabase
     if (navigator.onLine && sbClient) {
       try {
+        // Sikre at løperen finnes i runners-tabellen før innsjekking
+        await saveRunnerToSupabase(runner.id, runner.name);
         await saveCheckInToSupabase(entry);
       } catch (e) {
-        console.warn('Supabase-lagring feilet, lagrer lokalt:', e);
+        console.error('Supabase-feil:', e);
         showToast('⚠️ Nettverksfeil — lagret lokalt', 't-warn');
       }
     } else {
