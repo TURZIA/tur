@@ -1873,7 +1873,9 @@ async function generateRapport() {
 }
 
 function buildLeaderboard(data) {
-  const total = CONFIG.CHECKPOINTS.length;
+  // احسب عدد النقاط الفريدة من البيانات الفعلية
+  const uniqueCps = new Set(data.map(r => r.checkpoint_order).filter(Boolean));
+  const total = uniqueCps.size || CONFIG.CHECKPOINTS.length;
   const runners = {};
 
   data.forEach(row => {
