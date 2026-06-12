@@ -362,6 +362,38 @@
     .toast.t-error   { background: var(--red); }
     .toast.t-warn    { background: var(--amber); }
 
+    /* ===== PULSING CHECKPOINT MARKER ===== */
+    .cp-pulse-wrapper {
+      position: relative;
+      width: 44px; height: 44px;
+    }
+    .cp-dot {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px; height: 18px;
+      background: #1D9E75;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 2px #1D9E75;
+      z-index: 2;
+    }
+    .cp-ring {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px; height: 18px;
+      border: 3px solid #1D9E75;
+      border-radius: 50%;
+      animation: cp-expand 1.8s ease-out infinite;
+      opacity: 0;
+    }
+    .cp-ring-2 { animation-delay: 0.9s; }
+    @keyframes cp-expand {
+      0%   { width: 18px; height: 18px; opacity: 0.8; }
+      100% { width: 56px; height: 56px; opacity: 0; }
+    }
+
     /* ===== RAPPORT SCREEN ===== */
     #rapportScreen {
       background: var(--bg);
@@ -679,6 +711,24 @@ let positionMarker    = null;   // نقطة زرقاء
 let liveTrackLine     = null;   // خط المسار الحي
 let trackPoints       = [];     // نقاط المسار [[lat,lng],...]
 let cpMarkers         = {};     // { order: L.circleMarker }
+let activePulseMarker = null;   // وميض النقطة القريبة
+let activePulseOrder  = null;   // رقم النقطة التي تومض حالياً
+
+const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
+
+function saveTrack() {
+  try {
+    // احفظ آخر 800 نقطة فقط
+    const pts = trackPoints.slice(-800);
+    localStorage.setItem(LS_TRACK, JSON.stringify(pts));
+  } catch {}
+}
+
+function loadTrack() {
+  try {
+    return JSON.parse(localStorage.getItem(LS_TRACK)) || [];
+  } catch { return []; }
+}
 
 /* ============================================================
    PWA
@@ -882,8 +932,11 @@ function initMap() {
     maxZoom: 19,
   }).addTo(leafletMap);
 
-  // خط المسار الحي (فارغ في البداية)
-  liveTrackLine = L.polyline([], {
+  // استعد المسار المحفوظ من الجلسة السابقة
+  trackPoints = loadTrack();
+
+  // خط المسار الحي
+  liveTrackLine = L.polyline(trackPoints, {
     color: '#1D9E75', weight: 3, opacity: 0.8,
   }).addTo(leafletMap);
 
@@ -902,10 +955,53 @@ function drawCheckpointMarkers() {
   });
 }
 
-// تحوّل نقطة إلى حمراء عند التسجيل
+// تحوّل نقطة إلى حمراء عند التسجيل وتوقف الوميض
 function markCheckpointDone(order) {
+  stopPulse();
   if (cpMarkers[order]) {
     cpMarkers[order].setStyle({ fillColor: '#E24B4A' });
+  }
+}
+
+// ابدأ وميض النقطة القريبة
+function startPulse(cp) {
+  if (activePulseOrder === cp.order) return; // تومض بالفعل
+  stopPulse();
+  activePulseOrder = cp.order;
+
+  // أخفِ الدائرة العادية
+  if (cpMarkers[cp.order]) cpMarkers[cp.order].setStyle({ opacity: 0, fillOpacity: 0 });
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="cp-pulse-wrapper">
+             <div class="cp-dot"></div>
+             <div class="cp-ring"></div>
+             <div class="cp-ring cp-ring-2"></div>
+           </div>`,
+    iconSize:   [44, 44],
+    iconAnchor: [22, 22],
+  });
+
+  activePulseMarker = L.marker([cp.lat, cp.lng], { icon, zIndexOffset: 500 })
+    .addTo(leafletMap);
+}
+
+// أوقف الوميض
+function stopPulse() {
+  if (activePulseMarker) {
+    leafletMap.removeLayer(activePulseMarker);
+    activePulseMarker = null;
+  }
+  if (activePulseOrder !== null) {
+    // أعد إظهار الدائرة العادية (إذا لم تُسجَّل بعد)
+    if (cpMarkers[activePulseOrder]) {
+      const style = cpMarkers[activePulseOrder].options.fillColor === '#E24B4A'
+        ? { opacity: 1, fillOpacity: 1 }
+        : { opacity: 1, fillOpacity: 1 };
+      cpMarkers[activePulseOrder].setStyle(style);
+    }
+    activePulseOrder = null;
   }
 }
 
@@ -915,6 +1011,7 @@ function updateMapPosition(lat, lng) {
 
   trackPoints.push([lat, lng]);
   liveTrackLine.setLatLngs(trackPoints);
+  saveTrack();
 
   if (!positionMarker) {
     positionMarker = L.circleMarker([lat, lng], {
@@ -945,6 +1042,7 @@ function updateRegisterButton(lat, lng) {
   if (btn.disabled) return;
 
   if (!CONFIG.VERIFY_LOCATION || CONFIG.CHECKPOINTS.length === 0) {
+    stopPulse();
     btn.className = 'btn btn-green';
     btn.textContent = 'Registrer posisjon 📍';
     return;
@@ -954,14 +1052,16 @@ function updateRegisterButton(lat, lng) {
 
   if (distance <= CONFIG.MAX_DISTANCE_METERS) {
     if (cpOnCooldown(checkpoint.order)) {
-      // سُجّلت هذه النقطة خلال الساعة الماضية
+      stopPulse();
       btn.className = 'btn btn-gray';
       btn.textContent = `✓ ${checkpoint.name} — allerede registrert`;
     } else {
+      startPulse(checkpoint);   // وميض النقطة القريبة
       btn.className = 'btn btn-green';
       btn.textContent = 'Registrer posisjon 📍';
     }
   } else {
+    stopPulse();
     btn.className = 'btn btn-gray';
     btn.textContent = `${Math.round(distance)} m fra nærmeste punkt`;
   }
@@ -1307,6 +1407,8 @@ async function handleSignout() {
   await sbClient.auth.signOut();
   currentUser  = null;
   trackPoints  = [];
+  localStorage.removeItem(LS_TRACK);
+  stopPulse();
   showSigninForm();
   showScreen('loginScreen');
 }
