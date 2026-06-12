@@ -516,8 +516,8 @@
       <input type="password" id="signinPassword" placeholder="••••••••"
              autocomplete="current-password" />
     </div>
-    <div id="loginLoading">⏳ Logger inn…</div>
-    <button class="btn btn-green" id="signinBtn">Logg inn 🔐</button>
+    <div id="loginLoading">Logger inn…</div>
+    <button class="btn btn-green" id="signinBtn">Logg inn</button>
     <div class="auth-toggle">
       Ny bruker?
       <button class="auth-toggle-btn" id="showSignupBtn">Registrer deg her</button>
@@ -537,7 +537,7 @@
              autocomplete="email" autocorrect="off" spellcheck="false" />
     </div>
     <div id="resetMsg" style="display:none;text-align:center;font-size:0.85rem;padding:8px;border-radius:8px;"></div>
-    <button class="btn btn-green" id="sendResetBtn">Send tilbakestillingslenke 📧</button>
+    <button class="btn btn-green" id="sendResetBtn">Send tilbakestillingslenke</button>
     <div class="auth-toggle">
       <button class="auth-toggle-btn" id="backToSigninBtn">← Tilbake til innlogging</button>
     </div>
@@ -561,8 +561,8 @@
       <input type="password" id="signupPassword" placeholder="Minst 6 tegn"
              autocomplete="new-password" />
     </div>
-    <div id="signupLoading" class="loginLoading" style="display:none;text-align:center;color:var(--muted);font-size:0.9rem;padding:8px;">⏳ Oppretter konto…</div>
-    <button class="btn btn-green" id="signupBtn">Opprett konto 🚀</button>
+    <div id="signupLoading" class="loginLoading" style="display:none;text-align:center;color:var(--muted);font-size:0.9rem;padding:8px;">Oppretter konto…</div>
+    <button class="btn btn-green" id="signupBtn">Opprett konto</button>
     <div class="auth-toggle">
       Har du konto?
       <button class="auth-toggle-btn" id="showSigninBtn">Logg inn her</button>
@@ -572,7 +572,7 @@
 
 <!-- ===== RESET PASSWORD SCREEN ===== -->
 <div id="resetPasswordScreen" class="screen">
-  <div class="login-logo">🔑</div>
+  <div class="login-logo"></div>
   <div class="login-title">Nytt passord</div>
   <p class="login-sub">Velg et nytt passord for kontoen din</p>
   <div class="login-box">
@@ -585,7 +585,7 @@
       <input type="password" id="confirmPassword" placeholder="Gjenta passordet" autocomplete="new-password" />
     </div>
     <div id="newPassMsg" style="display:none;text-align:center;font-size:0.85rem;padding:8px;border-radius:8px;"></div>
-    <button class="btn btn-green" id="updatePassBtn">Lagre nytt passord ✅</button>
+    <button class="btn btn-green" id="updatePassBtn">Lagre nytt passord</button>
   </div>
 </div>
 
@@ -594,12 +594,12 @@
 
   <header class="app-header">
     <div class="header-left">
-      <button class="historikk-btn" id="historikkBtn">📋 Historikk</button>
+      <button class="historikk-btn" id="historikkBtn">Historikk</button>
       <span class="race-name" id="headerRaceName">Løypesjekk</span>
     </div>
     <div class="runner-info">
       <div style="display:flex;align-items:center;gap:8px;">
-        <button class="historikk-btn" id="rapportBtn" style="display:none;">📊 Rapport</button>
+        <button class="historikk-btn" id="rapportBtn" style="display:none;">Rapport</button>
         <span class="runner-name-display" id="headerRunnerName"></span>
       </div>
       <button class="ikke-deg-link" id="ikkeDegBtn">Ikke deg?</button>
@@ -632,7 +632,7 @@
 <div id="rapportScreen" class="screen">
   <div class="rapport-header">
     <button class="rapport-back" id="rapportBackBtn">← Tilbake</button>
-    <span class="rapport-title">📊 Generer rapport</span>
+    <span class="rapport-title">Generer rapport</span>
   </div>
   <div class="rapport-body">
 
@@ -659,7 +659,7 @@
     <button class="btn btn-green" id="genRapportBtn">📥 Last ned Excel-rapport</button>
     <button class="btn" id="sendRapportBtn"
       style="background:#3B82F6;color:#fff;margin-top:-8px;">
-      📧 Send til e-post
+      Send til e-post
     </button>
 
   </div>
@@ -669,7 +669,7 @@
 <div id="drawerOverlay"></div>
 <div id="historyDrawer">
   <div class="drawer-header">
-    <span class="drawer-title">📋 Historikk</span>
+    <span class="drawer-title">Historikk</span>
     <button class="drawer-close" id="drawerCloseBtn">✕</button>
   </div>
   <div class="drawer-runner-info">
@@ -1126,7 +1126,7 @@ function updateRegisterButton(lat, lng) {
   if (!CONFIG.VERIFY_LOCATION || CONFIG.CHECKPOINTS.length === 0) {
     stopPulse();
     btn.className = 'btn btn-green';
-    btn.textContent = 'Registrer posisjon 📍';
+    btn.textContent = 'Registrer posisjon';
     return;
   }
 
@@ -1140,7 +1140,7 @@ function updateRegisterButton(lat, lng) {
     } else {
       startPulse(checkpoint);   // وميض النقطة القريبة
       btn.className = 'btn btn-green';
-      btn.textContent = 'Registrer posisjon 📍';
+      btn.textContent = 'Registrer posisjon';
     }
   } else {
     stopPulse();
@@ -1167,7 +1167,7 @@ function checkProximityAlert(lat, lng) {
       // اهتزاز — نمط: قصير قصير طويل
       if (navigator.vibrate) navigator.vibrate([100, 80, 100, 80, 300]);
 
-      showToast(`📍 ${Math.round(dist)} m til ${cp.name}`, 't-warn', 5000);
+      showToast(`${Math.round(dist)} m til ${cp.name}`, 't-warn', 5000);
     }
 
     // خرج من المنطقة (أبعد من 80م) → أعد التنبيه للمرة القادمة
@@ -1340,7 +1340,7 @@ async function loadDrawerHistory() {
   if (!runner) return;
 
   document.getElementById('drawerRunnerName').textContent = runner.name;
-  document.getElementById('drawerBody').innerHTML = '<div class="drawer-loading">⏳ Laster historikk…</div>';
+  document.getElementById('drawerBody').innerHTML = '<div class="drawer-loading">Laster historikk…</div>';
 
   const history = await fetchRunnerHistory(runner.id);
 
@@ -1414,7 +1414,7 @@ async function registerPosition() {
 
     if (CONFIG.VERIFY_LOCATION && nearestCp && nearestDist > CONFIG.MAX_DISTANCE_METERS) {
       showToast(
-        `❌ For langt fra ${nearestCp.name} — ${Math.round(nearestDist)} m (maks ${CONFIG.MAX_DISTANCE_METERS} m)`,
+        `For langt fra ${nearestCp.name} — ${Math.round(nearestDist)} m (maks ${CONFIG.MAX_DISTANCE_METERS} m)`,
         't-error', 5000
       );
       return;
@@ -1448,7 +1448,7 @@ async function registerPosition() {
         await saveCheckInToSupabase(entry);
       } catch(e) {
         const msg = e?.message || JSON.stringify(e) || 'ukjent';
-        showToast('❌ ' + msg, 't-error', 8000);
+        showToast(msg, 't-error', 8000);
         console.error('Supabase:', e);
       }
     } else {
@@ -1462,11 +1462,11 @@ async function registerPosition() {
     if (nearestCp) markCheckpointDone(nearestCp.order);
 
     const cpLabel = nearestCp ? ` — ${nearestCp.name}` : '';
-    showToast(`✅ Registrert!${cpLabel}`, 't-success');
+    showToast(`Registrert!${cpLabel}`, 't-success');
 
   } catch(err) {
     if (err.code === 1) showGpsOverlay();
-    else showToast('❌ GPS-feil: ' + (err.message || 'ukjent'), 't-error', 5000);
+    else showToast('GPS-feil: ' + (err.message || 'ukjent'), 't-error', 5000);
   } finally {
     btn.disabled = false;
     // أعد تقييم حالة الزر بناءً على الموقع الحالي
@@ -1474,7 +1474,7 @@ async function registerPosition() {
       const ll = positionMarker.getLatLng();
       updateRegisterButton(ll.lat, ll.lng);
     } else {
-      btn.innerHTML = 'Registrer posisjon 📍';
+      btn.innerHTML = 'Registrer posisjon';
     }
   }
 }
@@ -1509,9 +1509,9 @@ async function handleSendReset() {
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sbClient.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
-    showMsg(msg, '✅ E-post sendt! Sjekk innboksen din.', 'green');
+    showMsg(msg, 'E-post sendt! Sjekk innboksen din.', 'green');
   } catch(e) {
-    showMsg(msg, '❌ ' + (e.message || 'Feil'), 'red');
+    showMsg(msg, '' + (e.message || 'Feil'), 'red');
   } finally {
     document.getElementById('sendResetBtn').disabled = false;
   }
@@ -1536,10 +1536,10 @@ async function handleUpdatePassword() {
   try {
     const { error } = await sbClient.auth.updateUser({ password: p1 });
     if (error) throw error;
-    showMsg(msg, '✅ Passord oppdatert! Logger inn…', 'green');
+    showMsg(msg, 'Passord oppdatert! Logger inn…', 'green');
     setTimeout(() => showScreen('loginScreen'), 2000);
   } catch(e) {
-    showMsg(msg, '❌ ' + (e.message || 'Feil'), 'red');
+    showMsg(msg, '' + (e.message || 'Feil'), 'red');
   } finally {
     document.getElementById('updatePassBtn').disabled = false;
   }
@@ -1548,7 +1548,7 @@ async function handleUpdatePassword() {
 async function handleSignin() {
   const email    = (document.getElementById('signinEmail').value    || '').trim();
   const password = (document.getElementById('signinPassword').value || '').trim();
-  if (!email || !password) { showToast('⚠️ Fyll inn e-post og passord', 't-warn'); return; }
+  if (!email || !password) { showToast('Fyll inn e-post og passord', 't-warn'); return; }
 
   document.getElementById('loginLoading').classList.add('visible');
   document.getElementById('signinBtn').disabled = true;
@@ -1558,7 +1558,7 @@ async function handleSignin() {
     if (error) throw error;
     await onAuthSuccess(data.user);
   } catch(e) {
-    showToast('❌ ' + (e.message || 'Innlogging feilet'), 't-error', 5000);
+    showToast('' + (e.message || 'Innlogging feilet'), 't-error', 5000);
   } finally {
     document.getElementById('loginLoading').classList.remove('visible');
     document.getElementById('signinBtn').disabled = false;
@@ -1570,9 +1570,9 @@ async function handleSignup() {
   const email    = (document.getElementById('signupEmail').value    || '').trim();
   const password = (document.getElementById('signupPassword').value || '').trim();
 
-  if (name.length < 2)   { showToast('⚠️ Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
-  if (!email)             { showToast('⚠️ Skriv inn e-post', 't-warn'); return; }
-  if (password.length < 6){ showToast('⚠️ Passordet må ha minst 6 tegn', 't-warn'); return; }
+  if (name.length < 2)   { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
+  if (!email)             { showToast('Skriv inn e-post', 't-warn'); return; }
+  if (password.length < 6){ showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
 
   document.getElementById('signupLoading').style.display = 'block';
   document.getElementById('signupBtn').disabled = true;
@@ -1587,7 +1587,7 @@ async function handleSignup() {
     await saveRunnerToSupabase(data.user.id, name);
     await onAuthSuccess(data.user, name);
   } catch(e) {
-    showToast('❌ ' + (e.message || 'Registrering feilet'), 't-error', 5000);
+    showToast('' + (e.message || 'Registrering feilet'), 't-error', 5000);
   } finally {
     document.getElementById('signupLoading').style.display = 'none';
     document.getElementById('signupBtn').disabled = false;
@@ -1710,12 +1710,12 @@ async function generateRapport() {
     const wb = buildWorkbook(data);
     XLSX.writeFile(wb, `Rapport_${fraStr}_til_${tilStr}.xlsx`);
 
-    resultEl.textContent = `✅ ${data.length} registreringer lastet ned.`;
+    resultEl.textContent = `${data.length} registreringer lastet ned.`;
     resultEl.className = 'visible';
     resultEl.style.display = 'block';
 
   } catch(e) {
-    showToast('❌ ' + (e.message || 'Feil ved henting av data'), 't-error', 5000);
+    showToast('' + (e.message || 'Feil ved henting av data'), 't-error', 5000);
   } finally {
     btn.disabled = false;
     btn.textContent = '📥 Last ned Excel-rapport';
@@ -1727,7 +1727,7 @@ async function fetchRapportData() {
   const til = getDateFromSelects('til');
   til.setHours(23, 59, 59, 999);
   if (fra > til) {
-    showToast('⚠️ Fra-dato må være før til-dato', 't-warn');
+    showToast('Fra-dato må være før til-dato', 't-warn');
     return null;
   }
   const { data, error } = await sbClient
@@ -1803,16 +1803,16 @@ async function sendRapportEmail() {
     // نزّل Excel على الجهاز أيضاً
     XLSX.writeFile(wb, fileName);
 
-    resultEl.textContent = `✅ E-post sendt til ${CONFIG.ADMIN_EMAIL} — ${data.length} registreringer`;
+    resultEl.textContent = `E-post sendt til ${CONFIG.ADMIN_EMAIL} — ${data.length} registreringer`;
     resultEl.className = 'visible';
     resultEl.style.display = 'block';
 
   } catch(e) {
-    showToast('❌ ' + (e?.text || e?.message || 'Sending feilet'), 't-error', 6000);
+    showToast('' + (e?.text || e?.message || 'Sending feilet'), 't-error', 6000);
     console.error(e);
   } finally {
     btn.disabled = false;
-    btn.textContent = '📧 Send til e-post';
+    btn.textContent = 'Send til e-post';
   }
 }
 
@@ -1902,7 +1902,7 @@ async function init() {
     showResetForm();
     setTimeout(() => {
       const msg = document.getElementById('resetMsg');
-      showMsg(msg, '⚠️ Lenken er utløpt. Send en ny tilbakestillingslenke.', 'amber');
+      showMsg(msg, 'Lenken er utløpt. Send en ny tilbakestillingslenke.', 'amber');
     }, 200);
     history.replaceState(null, '', window.location.pathname);
     return;
