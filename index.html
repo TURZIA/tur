@@ -580,6 +580,11 @@
       <input type="password" id="signupPassword" placeholder="Minst 6 tegn"
              autocomplete="new-password" />
     </div>
+    <div>
+      <div class="input-label">Admin-kode (får du av arrangøren)</div>
+      <input type="text" id="signupAdminCode" placeholder="f.eks. 4821"
+             autocomplete="off" autocorrect="off" autocapitalize="none" />
+    </div>
     <div id="signupLoading" class="loginLoading" style="display:none;text-align:center;color:var(--muted);font-size:0.9rem;padding:8px;">Oppretter konto…</div>
     <button class="btn btn-green" id="signupBtn">Opprett konto</button>
     <div class="auth-toggle">
@@ -620,6 +625,7 @@
       <div style="display:flex;align-items:center;gap:8px;">
         <button class="historikk-btn" id="rapportBtn" style="display:none;">Rapport</button>
         <button class="historikk-btn" id="cpAdminBtn" style="display:none;">Sjekkpunkter</button>
+        <button class="historikk-btn" id="superAdminBtn" style="display:none;">Admins</button>
         <span class="runner-name-display" id="headerRunnerName"></span>
       </div>
       <button class="ikke-deg-link" id="ikkeDegBtn">Ikke deg?</button>
@@ -645,6 +651,26 @@
 
   <div class="register-wrap">
     <button class="btn btn-gray" id="registerBtn">Henter posisjon…</button>
+  </div>
+</div>
+
+<!-- ===== SUPER ADMIN SCREEN ===== -->
+<div id="superAdminScreen" class="screen">
+  <div class="rapport-header">
+    <button class="rapport-back" id="superAdminBackBtn">← Tilbake</button>
+    <span class="rapport-title">Administrer admins</span>
+  </div>
+  <div class="rapport-body">
+    <div id="adminList" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <div class="rapport-card" style="margin-top:8px;">
+      <div class="rapport-card-title">Legg til ny admin</div>
+      <div>
+        <div class="input-label">E-post til admin</div>
+        <input type="email" id="newAdminEmail" placeholder="admin@example.com" autocorrect="off" autocapitalize="none" />
+      </div>
+      <button class="btn btn-green" id="addAdminBtn">Legg til admin</button>
+      <div id="addAdminMsg" style="display:none;font-size:0.85rem;padding:8px;border-radius:8px;text-align:center;"></div>
+    </div>
   </div>
 </div>
 
@@ -866,12 +892,14 @@ function initSupabase() {
   } catch(e) { console.error('Supabase init:', e); sbClient = null; }
 }
 
-async function saveRunnerToSupabase(id, name) {
+async function saveRunnerToSupabase(id, name, adminCode) {
   if (!sbClient) return;
   try {
+    const row = { id, name, created_at: new Date().toISOString() };
+    if (adminCode) row.admin_code = adminCode;
     await sbClient.from('runners').upsert(
-      { id, name, created_at: new Date().toISOString() },
-      { onConflict: 'id', ignoreDuplicates: true }
+      row,
+      { onConflict: 'id', ignoreDuplicates: false }
     );
   } catch(e) { console.warn('saveRunner:', e); }
 }
@@ -888,7 +916,7 @@ async function saveCheckInToSupabase(entry) {
     accuracy_meters:  entry.accuracy,
     elapsed_seconds:  entry.elapsed_seconds,
     timestamp:        entry.timestamp,
-    race_id:          CONFIG.RACE_ID,
+    race_id:          currentUser?.adminCode || CONFIG.RACE_ID,
   });
   if (error) throw error;
 }
@@ -1486,7 +1514,7 @@ async function registerPosition() {
       lat, lng, accuracy,
       timestamp:        nowIso,
       elapsed_seconds:  elapsedSeconds,
-      race_id:          CONFIG.RACE_ID,
+      race_id:          currentUser?.adminCode || CONFIG.RACE_ID,
     };
 
     if (navigator.onLine && sbClient) {
@@ -1613,11 +1641,17 @@ async function handleSignin() {
 }
 
 async function handleSignup() {
-  const name     = (document.getElementById('signupName').value     || '').trim();
-  const email    = (document.getElementById('signupEmail').value    || '').trim();
-  const password = (document.getElementById('signupPassword').value || '').trim();
+  const name      = (document.getElementById('signupName').value      || '').trim();
+  const email     = (document.getElementById('signupEmail').value     || '').trim();
+  const password  = (document.getElementById('signupPassword').value  || '').trim();
+  const adminCode = (document.getElementById('signupAdminCode').value || '').trim();
 
   if (name.length < 2)   { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
+  if (!adminCode)        { showToast('Skriv inn admin-koden fra arrangøren', 't-warn'); return; }
+
+  // Verifiser at admin-koden finnes
+  const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).single();
+  if (!adminRow)         { showToast('Ugyldig admin-kode — sjekk med arrangøren', 't-error', 5000); return; }
   if (!email)             { showToast('Skriv inn e-post', 't-warn'); return; }
   if (password.length < 6){ showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
 
@@ -1630,8 +1664,7 @@ async function handleSignup() {
       options: { data: { full_name: name } },
     });
     if (error) throw error;
-    // احفظ الاسم في runners table
-    await saveRunnerToSupabase(data.user.id, name);
+    await saveRunnerToSupabase(data.user.id, name, adminCode);
     await onAuthSuccess(data.user, name);
   } catch(e) {
     showToast('' + (e.message || 'Registrering feilet'), 't-error', 5000);
@@ -1642,23 +1675,33 @@ async function handleSignup() {
 }
 
 async function onAuthSuccess(user, nameOverride) {
-  // جلب الاسم من runners table أو من metadata
   let name = nameOverride || user.user_metadata?.full_name || '';
-  if (!name) {
-    try {
-      const { data } = await sbClient.from('runners').select('name').eq('id', user.id).single();
-      if (data?.name) name = data.name;
-    } catch {}
-  }
+  let adminCode = null;
+
+  try {
+    const { data } = await sbClient.from('runners').select('name,admin_code').eq('id', user.id).single();
+    if (data?.name && !name) name = data.name;
+    if (data?.admin_code) adminCode = data.admin_code;
+  } catch {}
+
   if (!name) name = user.email.split('@')[0];
 
-  currentUser = { id: user.id, name, email: user.email };
+  const isSuperAdmin = user.email === CONFIG.ADMIN_EMAIL;
 
-  const isAdmin = user.email === CONFIG.ADMIN_EMAIL;
-  document.getElementById('rapportBtn').style.display  = isAdmin ? '' : 'none';
-  document.getElementById('cpAdminBtn').style.display  = isAdmin ? '' : 'none';
+  // Admin-brukere: sjekk om de er admin i admins-tabellen
+  let isAdmin = isSuperAdmin;
+  if (!isSuperAdmin) {
+    const { data: aRow } = await sbClient.from('admins').select('admin_code').eq('email', user.email).single();
+    if (aRow) { isAdmin = true; adminCode = aRow.admin_code; }
+  }
 
-  await loadCheckpointsFromSupabase();
+  currentUser = { id: user.id, name, email: user.email, adminCode };
+
+  document.getElementById('rapportBtn').style.display   = isAdmin ? '' : 'none';
+  document.getElementById('cpAdminBtn').style.display   = isAdmin ? '' : 'none';
+  document.getElementById('superAdminBtn').style.display = isSuperAdmin ? '' : 'none';
+
+  await loadCheckpointsFromSupabase(adminCode);
   startMainScreen(currentUser);
 }
 
@@ -1928,6 +1971,65 @@ function openRapportScreen() {
 }
 
 /* ============================================================
+   SUPER ADMIN — manage admins
+   ============================================================ */
+function genAdminCode() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+async function openSuperAdminScreen() {
+  showScreen('superAdminScreen');
+  await renderAdminList();
+}
+
+async function renderAdminList() {
+  const el = document.getElementById('adminList');
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Laster…</div>';
+  const { data } = await sbClient.from('admins').select('*').order('created_at', { ascending: true });
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Ingen admins ennå.</div>';
+    return;
+  }
+  el.innerHTML = data.map(a => `
+    <div class="cp-admin-item">
+      <div class="cp-admin-num">${a.admin_code}</div>
+      <div class="cp-admin-info">
+        <div class="cp-admin-name">${a.email}</div>
+        <div class="cp-admin-coords">Kode: ${a.admin_code}</div>
+      </div>
+      <button class="cp-admin-del" data-id="${a.id}" title="Slett">✕</button>
+    </div>`).join('');
+  el.querySelectorAll('.cp-admin-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Slett denne adminen?')) return;
+      await sbClient.from('admins').delete().eq('id', btn.dataset.id);
+      await renderAdminList();
+    });
+  });
+}
+
+async function addAdmin() {
+  const email = (document.getElementById('newAdminEmail').value || '').trim().toLowerCase();
+  const msg   = document.getElementById('addAdminMsg');
+  if (!email) { showMsg(msg, 'Skriv inn e-post', 'amber'); return; }
+
+  // Generer unik kode
+  let code, exists = true;
+  while (exists) {
+    code = genAdminCode();
+    const { data } = await sbClient.from('admins').select('id').eq('admin_code', code);
+    exists = data && data.length > 0;
+  }
+
+  const { error } = await sbClient.from('admins').insert({ email, admin_code: code });
+  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
+
+  document.getElementById('newAdminEmail').value = '';
+  showMsg(msg, `Admin lagt til! Kode: ${code}`, 'green');
+  await renderAdminList();
+}
+
+/* ============================================================
    CHECKPOINT ADMIN
    ============================================================ */
 function parseDMS(str) {
@@ -1947,13 +2049,14 @@ function parseDMS(str) {
   return null;
 }
 
-async function loadCheckpointsFromSupabase() {
+async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
+  const raceId = adminCode || CONFIG.RACE_ID;
   try {
     const { data, error } = await sbClient
       .from('checkpoints')
       .select('*')
-      .eq('race_id', CONFIG.RACE_ID)
+      .eq('race_id', raceId)
       .order('cp_order', { ascending: true });
     if (error || !data || data.length === 0) return;
     CONFIG.CHECKPOINTS = data.map(r => ({
@@ -1971,8 +2074,9 @@ async function renderCpAdminList() {
   const el = document.getElementById('cpAdminList');
   el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Laster…</div>';
   try {
+    const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
     const { data } = await sbClient.from('checkpoints')
-      .select('*').eq('race_id', CONFIG.RACE_ID)
+      .select('*').eq('race_id', raceId)
       .order('cp_order', { ascending: true });
     if (!data || data.length === 0) {
       el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Ingen sjekkpunkter lagt til ennå.</div>';
@@ -2008,13 +2112,14 @@ async function addCheckpoint() {
   const pos = parseDMS(coords);
   if (!pos)    { showMsg(msg, 'Ugyldig koordinater — bruk desimal eller grader-format', 'red'); return; }
 
+  const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
   const { data: existing } = await sbClient.from('checkpoints')
-    .select('cp_order').eq('race_id', CONFIG.RACE_ID)
+    .select('cp_order').eq('race_id', raceId)
     .order('cp_order', { ascending: false }).limit(1);
   const nextOrder = existing && existing.length > 0 ? existing[0].cp_order + 1 : 1;
 
   const { error } = await sbClient.from('checkpoints').insert({
-    race_id: CONFIG.RACE_ID, cp_order: nextOrder,
+    race_id: raceId, cp_order: nextOrder,
     name, lat: pos.lat, lng: pos.lng,
   });
   if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
@@ -2116,6 +2221,9 @@ async function init() {
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
   document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('cpAddBtn').addEventListener('click', addCheckpoint);
+  document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
+  document.getElementById('superAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
 
