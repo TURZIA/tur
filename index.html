@@ -17,6 +17,8 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet-src.min.js"></script>
+  <!-- Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -358,6 +360,60 @@
     .toast.t-error   { background: var(--red); }
     .toast.t-warn    { background: var(--amber); }
 
+    /* ===== RAPPORT SCREEN ===== */
+    #rapportScreen {
+      background: var(--bg);
+      overflow-y: auto;
+    }
+    .rapport-header {
+      background: var(--green); color: #fff;
+      padding: 14px 16px;
+      padding-top: calc(14px + var(--safe-t));
+      display: flex; align-items: center; gap: 12px;
+      flex-shrink: 0;
+    }
+    .rapport-back {
+      background: rgba(255,255,255,0.2); border: none; color: #fff;
+      border-radius: 8px; padding: 6px 12px; font-size: 0.9rem;
+      font-weight: 700; cursor: pointer; min-height: 36px;
+    }
+    .rapport-title { font-size: 1.05rem; font-weight: 700; }
+    .rapport-body {
+      padding: 20px 16px;
+      display: flex; flex-direction: column; gap: 20px;
+      max-width: 480px; margin: 0 auto;
+    }
+    .rapport-card {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 20px; box-shadow: 0 1px 8px rgba(0,0,0,0.07);
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .rapport-card-title {
+      font-size: 0.8rem; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .date-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    }
+    .date-row label {
+      font-size: 0.75rem; font-weight: 600; color: var(--muted);
+      display: block; margin-bottom: 4px;
+    }
+    .date-row select {
+      width: 100%; padding: 10px 8px;
+      border: 2px solid var(--border); border-radius: 8px;
+      font-size: 0.95rem; background: var(--bg); color: var(--text);
+      outline: none; -webkit-appearance: none; cursor: pointer;
+    }
+    .date-row select:focus { border-color: var(--green); }
+    #rapportResult {
+      background: #F0FDF4; border-radius: 10px;
+      padding: 14px 16px; font-size: 0.9rem; color: #065F46;
+      display: none; text-align: center; font-weight: 600;
+    }
+    #rapportResult.visible { display: block; }
+    #rapportResult.error { background: #FEE2E2; color: #991B1B; }
+
     /* ===== IOS BANNER ===== */
     #iosBanner {
       display: none; position: fixed;
@@ -455,7 +511,10 @@
       <span class="race-name" id="headerRaceName">Løypesjekk</span>
     </div>
     <div class="runner-info">
-      <span class="runner-name-display" id="headerRunnerName"></span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="historikk-btn" id="rapportBtn" style="display:none;">📊 Rapport</button>
+        <span class="runner-name-display" id="headerRunnerName"></span>
+      </div>
       <button class="ikke-deg-link" id="ikkeDegBtn">Ikke deg?</button>
     </div>
   </header>
@@ -478,6 +537,39 @@
 
   <div class="register-wrap">
     <button class="btn btn-gray" id="registerBtn">Henter posisjon…</button>
+  </div>
+</div>
+
+<!-- ===== RAPPORT SCREEN ===== -->
+<div id="rapportScreen" class="screen">
+  <div class="rapport-header">
+    <button class="rapport-back" id="rapportBackBtn">← Tilbake</button>
+    <span class="rapport-title">📊 Generer rapport</span>
+  </div>
+  <div class="rapport-body">
+
+    <div class="rapport-card">
+      <div class="rapport-card-title">Fra dato</div>
+      <div class="date-row">
+        <div><label>Dag</label><select id="fraDay"></select></div>
+        <div><label>Måned</label><select id="fraMon"></select></div>
+        <div><label>År</label><select id="fraYear"></select></div>
+      </div>
+    </div>
+
+    <div class="rapport-card">
+      <div class="rapport-card-title">Til dato (standard: i dag)</div>
+      <div class="date-row">
+        <div><label>Dag</label><select id="tilDay"></select></div>
+        <div><label>Måned</label><select id="tilMon"></select></div>
+        <div><label>År</label><select id="tilYear"></select></div>
+      </div>
+    </div>
+
+    <div id="rapportResult"></div>
+
+    <button class="btn btn-green" id="genRapportBtn">📥 Last ned Excel-rapport</button>
+
   </div>
 </div>
 
@@ -526,6 +618,8 @@
 const CONFIG = {
   SUPABASE_URL:      'https://lbzvvcggisehfasvxmcm.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxienZ2Y2dnaXNlaGZhc3Z4bWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTg2MTgsImV4cCI6MjA5NjgzNDYxOH0.2J6xazbbbKbvMOxPP-ILIcZev-6o17aAYxZH0gONbb4',
+
+  ADMIN_EMAIL: 'ziadnasif77@gmail.com',   // فقط هذا الإيميل يرى زر التقرير
 
   RACE_NAME: 'Toppløpet',
   RACE_ID:   'topploepet-2025',
@@ -1189,6 +1283,13 @@ async function onAuthSuccess(user, nameOverride) {
   if (!name) name = user.email.split('@')[0];
 
   currentUser = { id: user.id, name, email: user.email };
+
+  // أظهر زر Rapport للمسؤول فقط
+  const rapportBtn = document.getElementById('rapportBtn');
+  if (rapportBtn) {
+    rapportBtn.style.display = user.email === CONFIG.ADMIN_EMAIL ? '' : 'none';
+  }
+
   startMainScreen(currentUser);
 }
 
@@ -1214,6 +1315,127 @@ async function startMainScreen(runner) {
     loadPreviousRegistrationsOnMap(runner.id);
     startGPS();
   }, 150);
+}
+
+/* ============================================================
+   RAPPORT — صفحة التقرير (للمسؤول فقط)
+   ============================================================ */
+const MONTHS_NB = [
+  'Januar','Februar','Mars','April','Mai','Juni',
+  'Juli','August','September','Oktober','November','Desember'
+];
+
+function populateDateSelects() {
+  const now = new Date();
+  const curY = now.getFullYear(), curM = now.getMonth() + 1, curD = now.getDate();
+  const years = [];
+  for (let y = curY; y >= curY - 3; y--) years.push(y);
+
+  ['fra','til'].forEach(prefix => {
+    const dayEl  = document.getElementById(prefix + 'Day');
+    const monEl  = document.getElementById(prefix + 'Mon');
+    const yearEl = document.getElementById(prefix + 'Year');
+
+    dayEl.innerHTML  = Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+    monEl.innerHTML  = MONTHS_NB.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+    yearEl.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+
+    // افتراضي Fra = أول الشهر الحالي، Til = اليوم
+    if (prefix === 'fra') {
+      dayEl.value  = '1';
+      monEl.value  = curM;
+      yearEl.value = curY;
+    } else {
+      dayEl.value  = curD;
+      monEl.value  = curM;
+      yearEl.value = curY;
+    }
+  });
+}
+
+function getDateFromSelects(prefix) {
+  const d = document.getElementById(prefix + 'Day').value;
+  const m = document.getElementById(prefix + 'Mon').value;
+  const y = document.getElementById(prefix + 'Year').value;
+  return new Date(y, m - 1, d);
+}
+
+async function generateRapport() {
+  const btn = document.getElementById('genRapportBtn');
+  const resultEl = document.getElementById('rapportResult');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  resultEl.className = '';
+  resultEl.style.display = 'none';
+
+  try {
+    const fra = getDateFromSelects('fra');
+    const til = getDateFromSelects('til');
+    til.setHours(23, 59, 59, 999);
+
+    if (fra > til) {
+      showToast('⚠️ Fra-dato må være før til-dato', 't-warn');
+      return;
+    }
+
+    const { data, error } = await sbClient
+      .from('check_ins')
+      .select('runner_name, checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, elapsed_seconds, timestamp, race_id')
+      .gte('timestamp', fra.toISOString())
+      .lte('timestamp', til.toISOString())
+      .order('timestamp', { ascending: true });
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      resultEl.textContent = 'Ingen registreringer i denne perioden.';
+      resultEl.className = 'visible error';
+      resultEl.style.display = 'block';
+      return;
+    }
+
+    // بناء صفوف Excel
+    const rows = data.map(r => ({
+      'Navn':             r.runner_name || '',
+      'Sjekkpunkt nr':    r.checkpoint_order || '',
+      'Sjekkpunkt navn':  r.checkpoint_name  || '',
+      'Dato':             new Date(r.timestamp).toLocaleDateString('nb-NO'),
+      'Klokkeslett':      new Date(r.timestamp).toLocaleTimeString('nb-NO'),
+      'Tid fra forrige (sek)': r.elapsed_seconds ?? '',
+      'Breddegrad':       r.lat_recorded  || '',
+      'Lengdegrad':       r.lng_recorded  || '',
+      'GPS nøyaktighet (m)': r.accuracy_meters || '',
+      'Løp ID':           r.race_id || '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // عرض الأعمدة
+    ws['!cols'] = [
+      {wch:20},{wch:14},{wch:24},{wch:12},{wch:12},
+      {wch:22},{wch:14},{wch:14},{wch:20},{wch:16},
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Rapport');
+
+    const fraStr = fra.toLocaleDateString('nb-NO').replace(/\./g,'-');
+    const tilStr = til.toLocaleDateString('nb-NO').replace(/\./g,'-');
+    XLSX.writeFile(wb, `Rapport_${fraStr}_til_${tilStr}.xlsx`);
+
+    resultEl.textContent = `✅ ${data.length} registreringer lastet ned.`;
+    resultEl.className = 'visible';
+    resultEl.style.display = 'block';
+
+  } catch(e) {
+    showToast('❌ ' + (e.message || 'Feil ved henting av data'), 't-error', 5000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📥 Last ned Excel-rapport';
+  }
+}
+
+function openRapportScreen() {
+  populateDateSelects();
+  document.getElementById('rapportResult').style.display = 'none';
+  showScreen('rapportScreen');
 }
 
 /* ============================================================
@@ -1279,6 +1501,11 @@ async function init() {
   document.getElementById('historikkBtn').addEventListener('click', openDrawer);
   document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+
+  // Rapport
+  document.getElementById('rapportBtn').addEventListener('click', openRapportScreen);
+  document.getElementById('rapportBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
 
   // تحقق من جلسة موجودة — إذا موجودة يدخل مباشرة بدون تسجيل دخول
   try {
