@@ -506,6 +506,9 @@ let watchId        = null;
 let iosWatchTimer  = null;
 let deferredPrompt = null;
 
+// النقاط التي أُرسل إشعار الاقتراب منها (حتى لا يتكرر)
+const alreadyAlerted = new Set();
+
 // Map
 let leafletMap        = null;
 let positionMarker    = null;   // نقطة زرقاء
@@ -801,12 +804,39 @@ function updateRegisterButton(lat, lng) {
   }
 }
 
+const PROXIMITY_ALERT_METERS = 50; // المسافة التي يبدأ عندها التنبيه
+
+function checkProximityAlert(lat, lng) {
+  if (!CONFIG.CHECKPOINTS.length) return;
+
+  CONFIG.CHECKPOINTS.forEach(cp => {
+    const dist = haversineMeters(lat, lng, cp.lat, cp.lng);
+    const key  = `alert_${cp.order}`;
+
+    // دخل المنطقة (50م) ولم يُنبَّه من قبل ولم يسجّل بعد
+    if (dist <= PROXIMITY_ALERT_METERS && dist > CONFIG.MAX_DISTANCE_METERS
+        && !alreadyAlerted.has(key) && !cpOnCooldown(cp.order)) {
+
+      alreadyAlerted.add(key);
+
+      // اهتزاز — نمط: قصير قصير طويل
+      if (navigator.vibrate) navigator.vibrate([100, 80, 100, 80, 300]);
+
+      showToast(`📍 ${Math.round(dist)} m til ${cp.name}`, 't-warn', 5000);
+    }
+
+    // خرج من المنطقة (أبعد من 80م) → أعد التنبيه للمرة القادمة
+    if (dist > 80) alreadyAlerted.delete(key);
+  });
+}
+
 function onGpsSuccess(position) {
   hideGpsOverlay();
   const { latitude: lat, longitude: lng, accuracy: acc } = position.coords;
 
   updateMapPosition(lat, lng);
   updateRegisterButton(lat, lng);
+  checkProximityAlert(lat, lng);
 
   if (acc <= 20)      setGpsBar('green',  `GPS OK — nøyaktighet ±${Math.round(acc)} m`);
   else if (acc <= 60) setGpsBar('yellow', `GPS svak — nøyaktighet ±${Math.round(acc)} m`);
