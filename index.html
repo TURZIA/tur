@@ -726,20 +726,12 @@
 
     <div class="rapport-card">
       <div class="rapport-card-title">Fra dato</div>
-      <div class="date-row">
-        <div><label>Dag</label><select id="fraDay"></select></div>
-        <div><label>Måned</label><select id="fraMon"></select></div>
-        <div><label>År</label><select id="fraYear"></select></div>
-      </div>
+      <input type="date" id="fraDate" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:1rem;background:var(--bg);" />
     </div>
 
     <div class="rapport-card">
-      <div class="rapport-card-title">Til dato (standard: i dag)</div>
-      <div class="date-row">
-        <div><label>Dag</label><select id="tilDay"></select></div>
-        <div><label>Måned</label><select id="tilMon"></select></div>
-        <div><label>År</label><select id="tilYear"></select></div>
-      </div>
+      <div class="rapport-card-title">Til dato</div>
+      <input type="date" id="tilDate" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:1rem;background:var(--bg);" />
     </div>
 
     <div id="rapportResult"></div>
@@ -1810,44 +1802,18 @@ function startRealtime(runner) {
 /* ============================================================
    RAPPORT — صفحة التقرير (للمسؤول فقط)
    ============================================================ */
-const MONTHS_NB = [
-  'Januar','Februar','Mars','April','Mai','Juni',
-  'Juli','August','September','Oktober','November','Desember'
-];
-
 function populateDateSelects() {
-  const now = new Date();
-  const curY = now.getFullYear(), curM = now.getMonth() + 1, curD = now.getDate();
-  const years = [];
-  for (let y = curY; y >= curY - 3; y--) years.push(y);
-
-  ['fra','til'].forEach(prefix => {
-    const dayEl  = document.getElementById(prefix + 'Day');
-    const monEl  = document.getElementById(prefix + 'Mon');
-    const yearEl = document.getElementById(prefix + 'Year');
-
-    dayEl.innerHTML  = Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
-    monEl.innerHTML  = MONTHS_NB.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
-    yearEl.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
-
-    // افتراضي Fra = أول الشهر الحالي، Til = اليوم
-    if (prefix === 'fra') {
-      dayEl.value  = '1';
-      monEl.value  = curM;
-      yearEl.value = curY;
-    } else {
-      dayEl.value  = curD;
-      monEl.value  = curM;
-      yearEl.value = curY;
-    }
-  });
+  const now   = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  document.getElementById('fraDate').value = firstOfMonth;
+  document.getElementById('tilDate').value = today;
 }
 
 function getDateFromSelects(prefix) {
-  const d = document.getElementById(prefix + 'Day').value;
-  const m = document.getElementById(prefix + 'Mon').value;
-  const y = document.getElementById(prefix + 'Year').value;
-  return new Date(y, m - 1, d);
+  const val = document.getElementById(prefix + 'Date').value;
+  if (!val) return new Date();
+  return new Date(val);
 }
 
 async function generateRapport() {
