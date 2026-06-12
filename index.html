@@ -437,6 +437,16 @@
     .lb-winner td { background:#d1fae5 !important; font-weight:700; }
     .lb-rank { font-weight:800; font-size:1rem; color:var(--green); }
     .lb-title { font-size:1rem; font-weight:700; margin-bottom:10px; color:var(--text); }
+    .cp-admin-item {
+      background:var(--surface); border-radius:var(--radius);
+      padding:14px 16px; display:flex; align-items:center; gap:12px;
+      box-shadow:0 1px 6px rgba(0,0,0,0.07);
+    }
+    .cp-admin-num { font-weight:800; color:var(--green); font-size:1.1rem; min-width:28px; }
+    .cp-admin-info { flex:1; }
+    .cp-admin-name { font-weight:600; font-size:0.95rem; }
+    .cp-admin-coords { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+    .cp-admin-del { background:none; border:none; color:var(--red); font-size:1.2rem; cursor:pointer; padding:4px 8px; }
     .lb-sub { font-size:0.8rem; color:var(--muted); margin-bottom:12px; }
     .date-row label {
       font-size: 0.75rem; font-weight: 600; color: var(--muted);
@@ -609,6 +619,7 @@
     <div class="runner-info">
       <div style="display:flex;align-items:center;gap:8px;">
         <button class="historikk-btn" id="rapportBtn" style="display:none;">Rapport</button>
+        <button class="historikk-btn" id="cpAdminBtn" style="display:none;">Sjekkpunkter</button>
         <span class="runner-name-display" id="headerRunnerName"></span>
       </div>
       <button class="ikke-deg-link" id="ikkeDegBtn">Ikke deg?</button>
@@ -634,6 +645,32 @@
 
   <div class="register-wrap">
     <button class="btn btn-gray" id="registerBtn">Henter posisjon…</button>
+  </div>
+</div>
+
+<!-- ===== CHECKPOINT ADMIN SCREEN ===== -->
+<div id="cpAdminScreen" class="screen">
+  <div class="rapport-header">
+    <button class="rapport-back" id="cpAdminBackBtn">← Tilbake</button>
+    <span class="rapport-title">Rediger sjekkpunkter</span>
+  </div>
+  <div class="rapport-body">
+    <div id="cpAdminList" style="display:flex;flex-direction:column;gap:10px;"></div>
+
+    <!-- Legg til skjema -->
+    <div class="rapport-card" id="cpAddForm" style="margin-top:8px;">
+      <div class="rapport-card-title">Legg til sjekkpunkt</div>
+      <div>
+        <div class="input-label">Navn</div>
+        <input type="text" id="cpNewName" placeholder="f.eks. Toppen" autocorrect="off" />
+      </div>
+      <div>
+        <div class="input-label">Koordinater (desimal eller grader)</div>
+        <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732  eller  59°57\'03.5"N 10°46\'23.7"E' autocorrect="off" autocapitalize="off" />
+      </div>
+      <button class="btn btn-green" id="cpAddBtn">+ Legg til</button>
+      <div id="cpAddMsg" style="display:none;font-size:0.85rem;padding:8px;border-radius:8px;text-align:center;"></div>
+    </div>
   </div>
 </div>
 
@@ -1617,12 +1654,11 @@ async function onAuthSuccess(user, nameOverride) {
 
   currentUser = { id: user.id, name, email: user.email };
 
-  // أظهر زر Rapport للمسؤول فقط
-  const rapportBtn = document.getElementById('rapportBtn');
-  if (rapportBtn) {
-    rapportBtn.style.display = user.email === CONFIG.ADMIN_EMAIL ? '' : 'none';
-  }
+  const isAdmin = user.email === CONFIG.ADMIN_EMAIL;
+  document.getElementById('rapportBtn').style.display  = isAdmin ? '' : 'none';
+  document.getElementById('cpAdminBtn').style.display  = isAdmin ? '' : 'none';
 
+  await loadCheckpointsFromSupabase();
   startMainScreen(currentUser);
 }
 
@@ -1887,7 +1923,123 @@ async function sendRapportEmail() {
 function openRapportScreen() {
   populateDateSelects();
   document.getElementById('rapportResult').style.display = 'none';
+  document.getElementById('leaderboard').style.display = 'none';
   showScreen('rapportScreen');
+}
+
+/* ============================================================
+   CHECKPOINT ADMIN
+   ============================================================ */
+function parseDMS(str) {
+  // Prøv desimalformat: "59.9510 10.7732"
+  const dec = str.trim().match(/^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/);
+  if (dec) return { lat: parseFloat(dec[1]), lng: parseFloat(dec[2]) };
+
+  // Prøv grader-format: 59°57'03.5"N 10°46'23.7"E
+  const dms = str.match(/(\d+)[°]\s*(\d+)[''']\s*([\d.]+)["""]\s*([NS])\s+(\d+)[°]\s*(\d+)[''']\s*([\d.]+)["""]\s*([EW])/i);
+  if (dms) {
+    let lat = +dms[1] + +dms[2]/60 + +dms[3]/3600;
+    let lng = +dms[5] + +dms[6]/60 + +dms[7]/3600;
+    if (dms[4].toUpperCase() === 'S') lat = -lat;
+    if (dms[8].toUpperCase() === 'W') lng = -lng;
+    return { lat, lng };
+  }
+  return null;
+}
+
+async function loadCheckpointsFromSupabase() {
+  if (!sbClient) return;
+  try {
+    const { data, error } = await sbClient
+      .from('checkpoints')
+      .select('*')
+      .eq('race_id', CONFIG.RACE_ID)
+      .order('cp_order', { ascending: true });
+    if (error || !data || data.length === 0) return;
+    CONFIG.CHECKPOINTS = data.map(r => ({
+      order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng,
+    }));
+  } catch(e) { console.warn('Checkpoint load:', e); }
+}
+
+async function openCpAdminScreen() {
+  showScreen('cpAdminScreen');
+  await renderCpAdminList();
+}
+
+async function renderCpAdminList() {
+  const el = document.getElementById('cpAdminList');
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Laster…</div>';
+  try {
+    const { data } = await sbClient.from('checkpoints')
+      .select('*').eq('race_id', CONFIG.RACE_ID)
+      .order('cp_order', { ascending: true });
+    if (!data || data.length === 0) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Ingen sjekkpunkter lagt til ennå.</div>';
+      return;
+    }
+    el.innerHTML = data.map(cp => `
+      <div class="cp-admin-item">
+        <div class="cp-admin-num">${cp.cp_order}</div>
+        <div class="cp-admin-info">
+          <div class="cp-admin-name">${cp.name}</div>
+          <div class="cp-admin-coords">${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}</div>
+        </div>
+        <button class="cp-admin-del" data-id="${cp.id}" title="Slett">✕</button>
+      </div>`).join('');
+    el.querySelectorAll('.cp-admin-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Slett dette sjekkpunktet?')) return;
+        await sbClient.from('checkpoints').delete().eq('id', btn.dataset.id);
+        await renderCpAdminList();
+        await loadCheckpointsFromSupabase();
+        rebuildMapMarkers();
+      });
+    });
+  } catch(e) { el.innerHTML = '<div style="color:var(--red);">Feil ved lasting.</div>'; }
+}
+
+async function addCheckpoint() {
+  const name   = document.getElementById('cpNewName').value.trim();
+  const coords = document.getElementById('cpNewCoords').value.trim();
+  const msg    = document.getElementById('cpAddMsg');
+
+  if (!name)   { showMsg(msg, 'Skriv inn et navn', 'amber'); return; }
+  const pos = parseDMS(coords);
+  if (!pos)    { showMsg(msg, 'Ugyldig koordinater — bruk desimal eller grader-format', 'red'); return; }
+
+  const { data: existing } = await sbClient.from('checkpoints')
+    .select('cp_order').eq('race_id', CONFIG.RACE_ID)
+    .order('cp_order', { ascending: false }).limit(1);
+  const nextOrder = existing && existing.length > 0 ? existing[0].cp_order + 1 : 1;
+
+  const { error } = await sbClient.from('checkpoints').insert({
+    race_id: CONFIG.RACE_ID, cp_order: nextOrder,
+    name, lat: pos.lat, lng: pos.lng,
+  });
+  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
+
+  document.getElementById('cpNewName').value   = '';
+  document.getElementById('cpNewCoords').value = '';
+  showMsg(msg, `Sjekkpunkt ${nextOrder} lagt til!`, 'green');
+  await renderCpAdminList();
+  await loadCheckpointsFromSupabase();
+  rebuildMapMarkers();
+}
+
+function rebuildMapMarkers() {
+  if (!leafletMap) return;
+  Object.values(cpMarkers).forEach(m => leafletMap.removeLayer(m));
+  Object.keys(cpMarkers).forEach(k => delete cpMarkers[k]);
+  if (activePulseMarker) { leafletMap.removeLayer(activePulseMarker); activePulseMarker = null; }
+  CONFIG.CHECKPOINTS.forEach(cp => {
+    const marker = L.circleMarker([cp.lat, cp.lng], {
+      radius: 9, color: '#fff', weight: 2,
+      fillColor: '#1D9E75', fillOpacity: 1,
+    }).addTo(leafletMap);
+    marker.bindTooltip(`${cp.order}. ${cp.name}`, { permanent: false, direction: 'top' });
+    cpMarkers[cp.order] = marker;
+  });
 }
 
 /* ============================================================
@@ -1961,6 +2113,9 @@ async function init() {
   // Rapport
   document.getElementById('rapportBtn').addEventListener('click', openRapportScreen);
   document.getElementById('rapportBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
+  document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('cpAddBtn').addEventListener('click', addCheckpoint);
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
 
