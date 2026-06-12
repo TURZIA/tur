@@ -1491,9 +1491,8 @@ async function handleSendReset() {
   if (!email) { showMsg(msg, 'Skriv inn e-postadressen din', 'amber'); return; }
   document.getElementById('sendResetBtn').disabled = true;
   try {
-    const { error } = await sbClient.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.href.split('#')[0],
-    });
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await sbClient.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
     showMsg(msg, '✅ E-post sendt! Sjekk innboksen din.', 'green');
   } catch(e) {
@@ -1882,8 +1881,8 @@ async function init() {
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
 
-  // إذا كان اللينك من إيميل reset password → اعرض شاشة تغيير الباسورد مباشرة
-  if (window.location.hash.includes('type=recovery')) {
+  // إذا كان اللينك من إيميل reset password أو رابط مباشر
+  if (window.location.hash.includes('type=recovery') || window.location.hash === '#reset') {
     showScreen('resetPasswordScreen');
     return;
   }
