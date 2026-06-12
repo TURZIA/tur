@@ -300,6 +300,25 @@
       grid-column: 1 / -1;
     }
 
+    .log-entry-checkpoint {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--green);
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .log-entry-elapsed {
+      font-size: 0.82rem;
+      color: var(--muted);
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .log-entry-accuracy {
       font-size: 0.78rem;
       padding: 2px 8px;
@@ -574,12 +593,32 @@ const CONFIG = {
   RACE_NAME: 'Toppløpet 2025',
   RACE_ID:   'topploepet-2025',
 
-  // Plasseringsverifisering (sett VERIFY_LOCATION: true når sjekkpunkt er klare)
-  VERIFY_LOCATION:     false,
-  MAX_DISTANCE_METERS: 10,
+  // Plasseringsverifisering (sett VERIFY_LOCATION: true når sjekkpunktene er klare)
+  VERIFY_LOCATION:     false,   // <-- sett true når løpet starter
+  MAX_DISTANCE_METERS: 5,
+
+  // 20 midlertidige sjekkpunkt — erstatt lat/lng med faktiske koordinater
   CHECKPOINTS: [
-    // { name: 'Start', lat: 59.9139, lng: 10.7522 },
-    // { name: 'Topp',  lat: 60.1234, lng: 10.5678 },
+    { order: 1,  name: 'NP-1 — Start',          lat: 59.91000, lng: 10.75000 },
+    { order: 2,  name: 'NP-2 — Skogsbrynet',     lat: 59.91500, lng: 10.75400 },
+    { order: 3,  name: 'NP-3 — Bekkekorset',     lat: 59.92100, lng: 10.75900 },
+    { order: 4,  name: 'NP-4 — Furuhøgda',       lat: 59.92700, lng: 10.76300 },
+    { order: 5,  name: 'NP-5 — Stien sørover',   lat: 59.93200, lng: 10.76800 },
+    { order: 6,  name: 'NP-6 — Vann ved dammen', lat: 59.93800, lng: 10.77200 },
+    { order: 7,  name: 'NP-7 — Steinrøysa',      lat: 59.94400, lng: 10.77700 },
+    { order: 8,  name: 'NP-8 — Åsryggen',        lat: 59.95000, lng: 10.78100 },
+    { order: 9,  name: 'NP-9 — Grantoppen',      lat: 59.95600, lng: 10.78600 },
+    { order: 10, name: 'NP-10 — Fjellplatå',     lat: 59.96200, lng: 10.79000 },
+    { order: 11, name: 'NP-11 — Utsiktspunktet', lat: 59.96800, lng: 10.79500 },
+    { order: 12, name: 'NP-12 — Nordskråningen', lat: 59.97300, lng: 10.79900 },
+    { order: 13, name: 'NP-13 — Torvmyra',       lat: 59.97900, lng: 10.80400 },
+    { order: 14, name: 'NP-14 — Elvesvingen',    lat: 59.98500, lng: 10.80800 },
+    { order: 15, name: 'NP-15 — Bjørkehagen',    lat: 59.99100, lng: 10.81300 },
+    { order: 16, name: 'NP-16 — Kolskrenten',    lat: 59.99700, lng: 10.81700 },
+    { order: 17, name: 'NP-17 — Lisiden ned',    lat: 60.00200, lng: 10.82200 },
+    { order: 18, name: 'NP-18 — Grusveien',      lat: 60.00800, lng: 10.82600 },
+    { order: 19, name: 'NP-19 — Siste bakken',   lat: 60.01400, lng: 10.83100 },
+    { order: 20, name: 'NP-20 — Mål',            lat: 60.02000, lng: 10.83500 },
   ],
 };
 
@@ -652,15 +691,35 @@ async function saveRunnerToSupabase(runnerId, name) {
 async function saveCheckInToSupabase(entry) {
   if (!sbClient) throw new Error('Ingen Supabase-tilkobling');
   const { error } = await sbClient.from('check_ins').insert({
-    runner_id:       entry.runner_id,
-    runner_name:     entry.runner_name,
-    lat_recorded:    entry.lat,
-    lng_recorded:    entry.lng,
-    accuracy_meters: entry.accuracy,
-    timestamp:       entry.timestamp,
-    race_id:         CONFIG.RACE_ID,
+    runner_id:         entry.runner_id,
+    runner_name:       entry.runner_name,
+    checkpoint_name:   entry.checkpoint_name,
+    checkpoint_order:  entry.checkpoint_order,
+    lat_recorded:      entry.lat,
+    lng_recorded:      entry.lng,
+    accuracy_meters:   entry.accuracy,
+    timestamp:         entry.timestamp,
+    elapsed_seconds:   entry.elapsed_seconds,
+    race_id:           CONFIG.RACE_ID,
   });
   if (error) throw error;
+}
+
+// Henter siste innsjekking for denne løperen fra Supabase for å beregne elapsed
+async function fetchLastCheckIn(runnerId) {
+  if (!sbClient) return null;
+  try {
+    const { data, error } = await sbClient
+      .from('check_ins')
+      .select('timestamp')
+      .eq('runner_id', runnerId)
+      .eq('race_id', CONFIG.RACE_ID)
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .single();
+    if (error || !data) return null;
+    return data;
+  } catch { return null; }
 }
 
 /* ============================================================
@@ -889,17 +948,28 @@ function renderLog(entries) {
   card.innerHTML = '';
 
   for (const e of entries) {
-    const accNum = Math.round(e.accuracy || 0);
-    const accCls = accNum <= 20 ? 'acc-good' : accNum <= 60 ? 'acc-ok' : 'acc-bad';
-    const ts     = new Date(e.timestamp).toLocaleString('nb-NO', {
-      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    const accNum  = Math.round(e.accuracy || 0);
+    const accCls  = accNum <= 20 ? 'acc-good' : accNum <= 60 ? 'acc-ok' : 'acc-bad';
+    const ts      = new Date(e.timestamp).toLocaleString('nb-NO', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
+
+    const checkpointHtml = e.checkpoint_name
+      ? `<span class="log-entry-checkpoint">🏁 ${escHtml(e.checkpoint_name)}</span>`
+      : '';
+
+    const elapsedHtml = (e.elapsed_seconds !== null && e.elapsed_seconds !== undefined)
+      ? `<span class="log-entry-elapsed">⏱ ${formatElapsed(e.elapsed_seconds)} fra forrige sjekkpunkt</span>`
+      : '';
 
     const div = document.createElement('div');
     div.className = 'log-entry';
     div.innerHTML = `
+      ${checkpointHtml}
       <span class="log-entry-name">${escHtml(e.runner_name || e.name || '')}</span>
       <span class="log-entry-time">${ts}</span>
+      ${elapsedHtml}
       <span class="log-entry-coords">${e.lat.toFixed(6)}, ${e.lng.toFixed(6)}</span>
       <span class="log-entry-accuracy ${accCls}">±${accNum} m nøyaktighet</span>
     `;
@@ -909,6 +979,18 @@ function renderLog(entries) {
 
 function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Formaterer sekunder → "X t Y min Z sek" eller "Y min Z sek" eller "Z sek"
+function formatElapsed(totalSeconds) {
+  const s = Math.round(totalSeconds);
+  if (s < 0) return '—';
+  const h   = Math.floor(s / 3600);
+  const m   = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h} t ${m} min ${sec} sek`;
+  if (m > 0) return `${m} min ${sec} sek`;
+  return `${sec} sek`;
 }
 
 /* ============================================================
@@ -938,12 +1020,20 @@ async function registerPosition() {
     const lng      = position.coords.longitude;
     const accuracy = position.coords.accuracy;
 
-    // Plasseringsverifisering
-    if (CONFIG.VERIFY_LOCATION && CONFIG.CHECKPOINTS.length > 0) {
-      const { checkpoint, distance } = findNearestCheckpoint(lat, lng);
-      if (distance > CONFIG.MAX_DISTANCE_METERS) {
+    // Finn nærmeste sjekkpunkt (alltid, uavhengig av VERIFY_LOCATION)
+    let nearestCheckpoint = null;
+    let nearestDistance   = null;
+    if (CONFIG.CHECKPOINTS.length > 0) {
+      const result = findNearestCheckpoint(lat, lng);
+      nearestCheckpoint = result.checkpoint;
+      nearestDistance   = result.distance;
+    }
+
+    // Plasseringsverifisering — avvis hvis for langt unna
+    if (CONFIG.VERIFY_LOCATION && nearestCheckpoint) {
+      if (nearestDistance > CONFIG.MAX_DISTANCE_METERS) {
         showToast(
-          `❌ For langt fra sjekkpunkt — ${Math.round(distance)} m (maks ${CONFIG.MAX_DISTANCE_METERS} m)`,
+          `❌ For langt fra ${nearestCheckpoint.name} — ${Math.round(nearestDistance)} m (maks ${CONFIG.MAX_DISTANCE_METERS} m)`,
           't-error',
           5000
         );
@@ -951,15 +1041,38 @@ async function registerPosition() {
       }
     }
 
+    const nowIso = new Date().toISOString();
+
+    // Beregn elapsed fra forrige innsjekking for denne løperen
+    let elapsedSeconds = null;
+    if (navigator.onLine && sbClient) {
+      const lastEntry = await fetchLastCheckIn(runner.id);
+      if (lastEntry && lastEntry.timestamp) {
+        elapsedSeconds = Math.round(
+          (new Date(nowIso) - new Date(lastEntry.timestamp)) / 1000
+        );
+      }
+    } else {
+      // Fallback: bruk økt-loggen lokalt
+      if (sessionLog.length > 0) {
+        elapsedSeconds = Math.round(
+          (new Date(nowIso) - new Date(sessionLog[0].timestamp)) / 1000
+        );
+      }
+    }
+
     const entry = {
-      runner_id:   runner.id,
-      runner_name: runner.name,
-      name:        runner.name,
+      runner_id:        runner.id,
+      runner_name:      runner.name,
+      name:             runner.name,
+      checkpoint_name:  nearestCheckpoint ? nearestCheckpoint.name  : null,
+      checkpoint_order: nearestCheckpoint ? nearestCheckpoint.order : null,
       lat,
       lng,
       accuracy,
-      timestamp:   new Date().toISOString(),
-      race_id:     CONFIG.RACE_ID,
+      timestamp:        nowIso,
+      elapsed_seconds:  elapsedSeconds,
+      race_id:          CONFIG.RACE_ID,
     };
 
     // Supabase
@@ -985,7 +1098,8 @@ async function registerPosition() {
     lastPosition = position;
     onGpsSuccess(position);
 
-    showToast('✅ Posisjon registrert!', 't-success');
+    const cpLabel = nearestCheckpoint ? ` — ${nearestCheckpoint.name}` : '';
+    showToast(`✅ Registrert!${cpLabel}`, 't-success');
 
   } catch (err) {
     if (err.code === 1) {
