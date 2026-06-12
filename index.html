@@ -1882,6 +1882,12 @@ async function init() {
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
 
+  // إذا كان اللينك من إيميل reset password → اعرض شاشة تغيير الباسورد مباشرة
+  if (window.location.hash.includes('type=recovery')) {
+    showScreen('resetPasswordScreen');
+    return;
+  }
+
   // تحقق من جلسة موجودة — إذا موجودة يدخل مباشرة بدون تسجيل دخول
   try {
     const { data: { session } } = await sbClient.auth.getSession();
