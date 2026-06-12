@@ -1465,41 +1465,26 @@ async function sendRapportEmail() {
     const fraStr = fra.toLocaleDateString('nb-NO');
     const tilStr = til.toLocaleDateString('nb-NO');
 
-    // بناء جدول HTML للإيميل
-    const tableRows = data.map(r =>
-      `<tr>
-        <td>${r.runner_name||''}</td>
-        <td>${r.checkpoint_order||''}</td>
-        <td>${r.checkpoint_name||''}</td>
-        <td>${new Date(r.timestamp).toLocaleDateString('nb-NO')}</td>
-        <td>${new Date(r.timestamp).toLocaleTimeString('nb-NO')}</td>
-        <td>${r.elapsed_seconds != null ? r.elapsed_seconds + ' sek' : '—'}</td>
-      </tr>`
-    ).join('');
+    // بناء Excel وتحويله لـ base64
+    const wb       = buildWorkbook(data);
+    const fileName = `Rapport_${fraStr.replace(/\./g,'-')}_til_${tilStr.replace(/\./g,'-')}.xlsx`;
+    const b64      = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
 
-    const tableHtml = `
-      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif;font-size:13px;">
-        <thead style="background:#1D9E75;color:#fff;">
-          <tr><th>Navn</th><th>Nr</th><th>Sjekkpunkt</th><th>Dato</th><th>Tid</th><th>Fra forrige</th></tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>`;
-
-    // أرسل الإيميل
+    // أرسل الإيميل مع الملف كمرفق
     emailjs.init(CONFIG.EMAILJS_PUBLIC_KEY);
     await emailjs.send(CONFIG.EMAILJS_SERVICE, CONFIG.EMAILJS_TEMPLATE, {
-      title:   `Rapport ${fraStr} – ${tilStr}`,
-      name:    currentUser.name,
-      fra:     fraStr,
-      til:     tilStr,
-      count:   data.length,
-      message: tableHtml,
-      email:   currentUser.email,
+      title:      `Rapport ${fraStr} – ${tilStr}`,
+      name:       currentUser.name,
+      fra:        fraStr,
+      til:        tilStr,
+      count:      data.length,
+      message:    `Rapport for perioden ${fraStr} til ${tilStr}.\nAntall registreringer: ${data.length}.`,
+      email:      currentUser.email,
+      attachment: b64,
     });
 
-    // نزّل Excel أيضاً
-    const wb = buildWorkbook(data);
-    XLSX.writeFile(wb, `Rapport_${fraStr.replace(/\./g,'-')}_til_${tilStr.replace(/\./g,'-')}.xlsx`);
+    // نزّل Excel على الجهاز أيضاً
+    XLSX.writeFile(wb, fileName);
 
     resultEl.textContent = `✅ E-post sendt til ${CONFIG.ADMIN_EMAIL} — ${data.length} registreringer`;
     resultEl.className = 'visible';
