@@ -2323,9 +2323,31 @@ function setupPullToRefresh() {
     if (dy > threshold) {
       indicator.textContent = 'Oppdaterer…';
       indicator.style.height = '40px';
-      setTimeout(() => window.location.reload(true), 400);
+      setTimeout(async () => {
+        await refreshCurrentScreen();
+        indicator.style.height = '0';
+      }, 400);
     }
   });
+}
+
+async function refreshCurrentScreen() {
+  const active = document.querySelector('.screen.active')?.id;
+  const adminCode = currentUser?.adminCode || null;
+
+  if (active === 'mainScreen') {
+    await loadCheckpointsFromSupabase(adminCode);
+    rebuildMapMarkers();
+    if (currentUser) await loadPreviousRegistrationsOnMap(currentUser.id);
+    if (document.getElementById('historyDrawer').classList.contains('open') && currentUser)
+      await loadHistoryDrawer(currentUser.id);
+  } else if (active === 'cpAdminScreen') {
+    await renderCpAdminList();
+  } else if (active === 'superAdminScreen') {
+    await renderAdminList();
+  } else if (active === 'rapportScreen') {
+    // لا شيء — المستخدم يضغط الزر بنفسه
+  }
 }
 
 function setupOfflineBanner() {
