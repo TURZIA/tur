@@ -715,6 +715,14 @@
   </div>
   <div class="rapport-body">
 
+    <!-- Velg admin (kun synlig for super admin) -->
+    <div class="rapport-card" id="adminSelectCard" style="display:none;">
+      <div class="rapport-card-title">Velg admin</div>
+      <select id="adminSelect" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;">
+        <option value="">-- Velg admin --</option>
+      </select>
+    </div>
+
     <div class="rapport-card">
       <div class="rapport-card-title">Fra dato</div>
       <div class="date-row">
@@ -1937,14 +1945,27 @@ async function fetchRapportData() {
     showToast('Fra-dato må være før til-dato', 't-warn');
     return null;
   }
-  const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
-  const { data, error } = await sbClient
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  const selectedCode = document.getElementById('adminSelect')?.value;
+  const raceId = isSuperAdmin
+    ? (selectedCode || null)
+    : (currentUser?.adminCode || CONFIG.RACE_ID);
+
+  if (isSuperAdmin && !selectedCode) {
+    showToast('Velg en admin først', 't-warn');
+    return null;
+  }
+
+  let query = sbClient
     .from('check_ins')
     .select('runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
-    .eq('race_id', raceId)
     .gte('timestamp', fra.toISOString())
     .lte('timestamp', til.toISOString())
     .order('timestamp', { ascending: true });
+
+  if (raceId) query = query.eq('race_id', raceId);
+
+  const { data, error } = await query;
   if (error) throw error;
   return { data: data || [], fra, til };
 }
@@ -2026,10 +2047,30 @@ async function sendRapportEmail() {
   }
 }
 
-function openRapportScreen() {
+async function openRapportScreen() {
   populateDateSelects();
   document.getElementById('rapportResult').style.display = 'none';
   document.getElementById('leaderboard').style.display = 'none';
+
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  const card = document.getElementById('adminSelectCard');
+  const sel  = document.getElementById('adminSelect');
+
+  if (isSuperAdmin) {
+    card.style.display = '';
+    // لod قائمة الأدمن
+    const { data } = await sbClient.from('admins').select('email,admin_code').order('created_at');
+    sel.innerHTML = '<option value="">-- Velg admin --</option>';
+    (data || []).forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.admin_code;
+      opt.textContent = `${a.email} (${a.admin_code})`;
+      sel.appendChild(opt);
+    });
+  } else {
+    card.style.display = 'none';
+  }
+
   showScreen('rapportScreen');
 }
 
