@@ -711,8 +711,12 @@ let positionMarker    = null;   // نقطة زرقاء
 let liveTrackLine     = null;   // خط المسار الحي
 let trackPoints       = [];     // نقاط المسار [[lat,lng],...]
 let cpMarkers         = {};     // { order: L.circleMarker }
-let activePulseMarker = null;   // وميض النقطة القريبة
-let activePulseOrder  = null;   // رقم النقطة التي تومض حالياً
+let activePulseMarker = null;
+let activePulseOrder  = null;
+let lastTrackedPos    = null;   // آخر موقع أُضيف للمسار
+let bestRecentPos     = null;   // أدق موقع من آخر 10 ثوانٍ (للتسجيل)
+
+const MIN_MOVE_METERS = 4;      // لا تحدّث المسار إلا إذا تحركت أكثر من 4م
 
 const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
 
@@ -1006,9 +1010,25 @@ function stopPulse() {
 }
 
 // تحديث موقع النقطة الزرقاء والمسار
-function updateMapPosition(lat, lng) {
+function updateMapPosition(lat, lng, accuracy) {
   if (!leafletMap) return;
 
+  // احفظ أدق قراءة من آخر 10 ثوانٍ للاستخدام عند التسجيل
+  if (!bestRecentPos || accuracy <= bestRecentPos.accuracy) {
+    bestRecentPos = { lat, lng, accuracy, ts: Date.now() };
+  }
+  // أعد تصفير bestRecentPos كل 10 ثوانٍ
+  if (Date.now() - bestRecentPos.ts > 10000) {
+    bestRecentPos = { lat, lng, accuracy, ts: Date.now() };
+  }
+
+  // لا تضف للمسار إلا إذا تحركت فعلياً أكثر من MIN_MOVE_METERS
+  if (lastTrackedPos) {
+    const moved = haversineMeters(lastTrackedPos[0], lastTrackedPos[1], lat, lng);
+    if (moved < MIN_MOVE_METERS) return; // drift — تجاهل
+  }
+
+  lastTrackedPos = [lat, lng];
   trackPoints.push([lat, lng]);
   liveTrackLine.setLatLngs(trackPoints);
   saveTrack();
@@ -1097,7 +1117,7 @@ function onGpsSuccess(position) {
   hideGpsOverlay();
   const { latitude: lat, longitude: lng, accuracy: acc } = position.coords;
 
-  updateMapPosition(lat, lng);
+  updateMapPosition(lat, lng, acc);
   updateRegisterButton(lat, lng);
   checkProximityAlert(lat, lng);
 
@@ -1240,9 +1260,13 @@ async function registerPosition() {
       })
     );
 
-    const lat      = position.coords.latitude;
-    const lng      = position.coords.longitude;
-    const accuracy = position.coords.accuracy;
+    // استخدم أدق قراءة من آخر 10 ثوانٍ بدل اللحظية لتجنب drift
+    const useBest = bestRecentPos && (Date.now() - bestRecentPos.ts) < 10000
+      && bestRecentPos.accuracy <= position.coords.accuracy;
+
+    const lat      = useBest ? bestRecentPos.lat : position.coords.latitude;
+    const lng      = useBest ? bestRecentPos.lng : position.coords.longitude;
+    const accuracy = useBest ? bestRecentPos.accuracy : position.coords.accuracy;
 
     let nearestCp   = null;
     let nearestDist = null;
