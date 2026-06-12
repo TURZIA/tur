@@ -189,7 +189,16 @@
       position: relative;
       overflow: hidden;
     }
-    #map { width: 100%; height: 100%; }
+    #map {
+      width: 100%; height: 100%;
+      transition: transform 0.3s ease-out;
+      transform-origin: center center;
+    }
+    /* counter-rotate controls so they stay upright */
+    #map .leaflet-control-zoom,
+    #map .leaflet-control-attribution {
+      transition: transform 0.3s ease-out;
+    }
 
     /* Leaflet overrides */
     .leaflet-control-attribution { font-size: 9px !important; }
@@ -1256,9 +1265,9 @@ function updateCompass(lat, lng) {
 
   // الخط المتقطع
   arrowLine = L.polyline([from, arrowTip], {
-    color: '#F59E0B',
+    color: '#FF6B6B',
     weight: 3,
-    opacity: 0.85,
+    opacity: 0.9,
     dashArray: '8 6',
   }).addTo(leafletMap);
 
@@ -1273,7 +1282,7 @@ function updateCompass(lat, lng) {
   // SVG رأس السهم
   const svgArrow = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
     <g transform="rotate(${angleDeg},14,14)">
-      <polygon points="14,1 20,24 14,19 8,24" fill="#F59E0B" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+      <polygon points="14,1 20,24 14,19 8,24" fill="#FF6B6B" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
     </g>
   </svg>`;
 
@@ -1288,7 +1297,58 @@ function updateCompass(lat, lng) {
     .addTo(leafletMap);
 }
 
-function initCompass() {} // لا شيء مطلوب، السهم على الخريطة مباشرة
+/* ============================================================
+   MAP ROTATION based on device compass heading
+   ============================================================ */
+let mapHeading = 0;
+let mapRotateEnabled = false;
+
+function applyMapRotation(deg) {
+  mapHeading = deg;
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+  mapEl.style.transform = `rotate(${-deg}deg)`;
+  // counter-rotate controls
+  mapEl.querySelectorAll('.leaflet-control-zoom, .leaflet-control-attribution')
+    .forEach(el => { el.style.transform = `rotate(${deg}deg)`; });
+}
+
+function initCompass() {
+  const handler = (e) => {
+    let heading = null;
+    if (e.webkitCompassHeading != null) {
+      heading = e.webkitCompassHeading;          // iOS
+    } else if (e.absolute && e.alpha != null) {
+      heading = (360 - e.alpha) % 360;           // Android absolute
+    } else if (e.alpha != null) {
+      heading = (360 - e.alpha) % 360;
+    }
+    if (heading !== null) {
+      mapRotateEnabled = true;
+      applyMapRotation(heading);
+    }
+  };
+
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+ يحتاج إذن — نطلبه بعد تفاعل المستخدم
+    const btn = document.createElement('button');
+    btn.textContent = '🧭 تفعيل البوصلة';
+    btn.className = 'btn btn-green';
+    btn.style.cssText = 'position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:1000;font-size:0.8rem;padding:8px 16px;';
+    document.getElementById('mapContainer').appendChild(btn);
+    btn.addEventListener('click', () => {
+      DeviceOrientationEvent.requestPermission().then(s => {
+        if (s === 'granted') {
+          window.addEventListener('deviceorientation', handler, true);
+          btn.remove();
+        }
+      }).catch(() => btn.remove());
+    });
+  } else if (typeof DeviceOrientationEvent !== 'undefined') {
+    window.addEventListener('deviceorientation', handler, true);
+  }
+}
 
 /* ============================================================
    FORMAT ELAPSED
