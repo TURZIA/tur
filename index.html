@@ -507,6 +507,25 @@
       Ny bruker?
       <button class="auth-toggle-btn" id="showSignupBtn">Registrer deg her</button>
     </div>
+    <div style="text-align:center;margin-top:4px;">
+      <button class="auth-toggle-btn" id="showResetBtn">Glemt passord?</button>
+    </div>
+  </div>
+
+  <!-- فورم نسيت كلمة المرور -->
+  <div class="login-box" id="resetBox" style="display:none;">
+    <div class="auth-divider">Glemt passord</div>
+    <p style="font-size:0.85rem;color:var(--muted);text-align:center;margin-bottom:4px;">Skriv inn e-postadressen din, så sender vi deg en lenke for å tilbakestille passordet.</p>
+    <div>
+      <div class="input-label">E-post</div>
+      <input type="email" id="resetEmail" placeholder="ola@example.com"
+             autocomplete="email" autocorrect="off" spellcheck="false" />
+    </div>
+    <div id="resetMsg" style="display:none;text-align:center;font-size:0.85rem;padding:8px;border-radius:8px;"></div>
+    <button class="btn btn-green" id="sendResetBtn">Send tilbakestillingslenke 📧</button>
+    <div class="auth-toggle">
+      <button class="auth-toggle-btn" id="backToSigninBtn">← Tilbake til innlogging</button>
+    </div>
   </div>
 
   <!-- فورم إنشاء حساب جديد -->
@@ -533,6 +552,25 @@
       Har du konto?
       <button class="auth-toggle-btn" id="showSigninBtn">Logg inn her</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== RESET PASSWORD SCREEN ===== -->
+<div id="resetPasswordScreen" class="screen">
+  <div class="login-logo">🔑</div>
+  <div class="login-title">Nytt passord</div>
+  <p class="login-sub">Velg et nytt passord for kontoen din</p>
+  <div class="login-box">
+    <div>
+      <div class="input-label">Nytt passord</div>
+      <input type="password" id="newPassword" placeholder="Minst 6 tegn" autocomplete="new-password" />
+    </div>
+    <div>
+      <div class="input-label">Bekreft passord</div>
+      <input type="password" id="confirmPassword" placeholder="Gjenta passordet" autocomplete="new-password" />
+    </div>
+    <div id="newPassMsg" style="display:none;text-align:center;font-size:0.85rem;padding:8px;border-radius:8px;"></div>
+    <button class="btn btn-green" id="updatePassBtn">Lagre nytt passord ✅</button>
   </div>
 </div>
 
@@ -1432,10 +1470,65 @@ async function registerPosition() {
 function showSigninForm() {
   document.getElementById('signinBox').style.display  = '';
   document.getElementById('signupBox').style.display  = 'none';
+  document.getElementById('resetBox').style.display   = 'none';
 }
 function showSignupForm() {
   document.getElementById('signinBox').style.display  = 'none';
   document.getElementById('signupBox').style.display  = '';
+  document.getElementById('resetBox').style.display   = 'none';
+}
+function showResetForm() {
+  document.getElementById('signinBox').style.display  = 'none';
+  document.getElementById('signupBox').style.display  = 'none';
+  document.getElementById('resetBox').style.display   = '';
+  document.getElementById('resetMsg').style.display   = 'none';
+  document.getElementById('resetEmail').value         = '';
+}
+
+async function handleSendReset() {
+  const email = document.getElementById('resetEmail').value.trim();
+  const msg   = document.getElementById('resetMsg');
+  if (!email) { showMsg(msg, 'Skriv inn e-postadressen din', 'amber'); return; }
+  document.getElementById('sendResetBtn').disabled = true;
+  try {
+    const { error } = await sbClient.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href.split('#')[0],
+    });
+    if (error) throw error;
+    showMsg(msg, '✅ E-post sendt! Sjekk innboksen din.', 'green');
+  } catch(e) {
+    showMsg(msg, '❌ ' + (e.message || 'Feil'), 'red');
+  } finally {
+    document.getElementById('sendResetBtn').disabled = false;
+  }
+}
+
+function showMsg(el, text, color) {
+  el.textContent = text;
+  el.style.display = '';
+  el.style.background = color === 'green' ? '#d1fae5'
+    : color === 'red' ? '#fee2e2' : '#fef3c7';
+  el.style.color = color === 'green' ? '#065f46'
+    : color === 'red' ? '#991b1b' : '#92400e';
+}
+
+async function handleUpdatePassword() {
+  const p1 = document.getElementById('newPassword').value;
+  const p2 = document.getElementById('confirmPassword').value;
+  const msg = document.getElementById('newPassMsg');
+  if (!p1 || p1.length < 6) { showMsg(msg, 'Passordet må ha minst 6 tegn', 'amber'); return; }
+  if (p1 !== p2)             { showMsg(msg, 'Passordene stemmer ikke', 'red'); return; }
+  document.getElementById('updatePassBtn').disabled = true;
+  try {
+    const { error } = await sbClient.auth.updateUser({ password: p1 });
+    if (error) throw error;
+    showMsg(msg, '✅ Passord oppdatert! Logger inn…', 'green');
+    setTimeout(() => showScreen('loginScreen'), 2000);
+  } catch(e) {
+    showMsg(msg, '❌ ' + (e.message || 'Feil'), 'red');
+  } finally {
+    document.getElementById('updatePassBtn').disabled = false;
+  }
 }
 
 async function handleSignin() {
@@ -1766,6 +1859,10 @@ async function init() {
   document.getElementById('signupBtn').addEventListener('click', handleSignup);
   document.getElementById('showSignupBtn').addEventListener('click', showSignupForm);
   document.getElementById('showSigninBtn').addEventListener('click', showSigninForm);
+  document.getElementById('showResetBtn').addEventListener('click', showResetForm);
+  document.getElementById('backToSigninBtn').addEventListener('click', showSigninForm);
+  document.getElementById('sendResetBtn').addEventListener('click', handleSendReset);
+  document.getElementById('updatePassBtn').addEventListener('click', handleUpdatePassword);
   document.getElementById('ikkeDegBtn').addEventListener('click', handleSignout);
 
   // Enter key على حقول الإدخال
@@ -1799,7 +1896,9 @@ async function init() {
 
   // استمع لتغييرات الجلسة (logout من تبويب آخر مثلاً)
   sbClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_OUT') {
+    if (event === 'PASSWORD_RECOVERY') {
+      showScreen('resetPasswordScreen');
+    } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       trackPoints = [];
       showSigninForm();
