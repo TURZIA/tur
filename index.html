@@ -669,7 +669,7 @@ function injectManifest() {
 function initSupabase() {
   try {
     // supabaseJs er det globale objektet fra CDN-en
-    sbClient = supabaseJs.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    sbClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
   } catch (e) {
     console.error('Supabase-initialisering feilet:', e);
     sbClient = null;
