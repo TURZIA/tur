@@ -69,8 +69,9 @@
       align-items: center;
       justify-content: center;
       padding: 24px;
-      gap: 24px;
+      gap: 20px;
       background: var(--bg);
+      overflow-y: auto;
     }
     .login-logo { font-size: 4rem; line-height: 1; }
     .login-title { font-size: 1.6rem; font-weight: 700; text-align: center; color: var(--green); }
@@ -81,19 +82,40 @@
       border-radius: var(--radius);
       padding: 28px 24px;
       box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-      display: flex; flex-direction: column; gap: 16px;
+      display: flex; flex-direction: column; gap: 14px;
     }
     .input-label {
       font-size: 0.85rem; font-weight: 600; color: var(--muted);
       text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;
     }
-    input[type="text"] {
+    input[type="text"], input[type="email"], input[type="password"] {
       width: 100%; padding: 14px 16px;
       border: 2px solid var(--border); border-radius: 10px;
       font-size: 1.05rem; background: var(--bg); color: var(--text);
       outline: none; transition: border-color 0.2s; -webkit-appearance: none;
     }
-    input[type="text"]:focus { border-color: var(--green); }
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="password"]:focus { border-color: var(--green); }
+
+    .auth-toggle {
+      text-align: center; font-size: 0.88rem; color: var(--muted);
+    }
+    .auth-toggle-btn {
+      background: none; border: none; color: var(--green);
+      font-weight: 700; font-size: 0.88rem; cursor: pointer;
+      text-decoration: underline; padding: 0;
+    }
+    .auth-divider {
+      font-size: 0.75rem; color: var(--muted);
+      text-align: center; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    #loginLoading {
+      display: none; text-align: center;
+      color: var(--muted); font-size: 0.9rem; padding: 8px;
+    }
+    #loginLoading.visible { display: block; }
 
     /* ===== BUTTONS ===== */
     .btn {
@@ -375,13 +397,52 @@
   <div class="login-logo">🏔️</div>
   <div class="login-title" id="loginTitle">Løypesjekk</div>
   <p class="login-sub">Registrer GPS-posisjon ved sjekkpunkt</p>
-  <div class="login-box">
+
+  <!-- فورم تسجيل الدخول -->
+  <div class="login-box" id="signinBox">
+    <div class="auth-divider">Logg inn</div>
+    <div>
+      <div class="input-label">E-post</div>
+      <input type="email" id="signinEmail" placeholder="ola@example.com"
+             autocomplete="email" autocorrect="off" spellcheck="false" />
+    </div>
+    <div>
+      <div class="input-label">Passord</div>
+      <input type="password" id="signinPassword" placeholder="••••••••"
+             autocomplete="current-password" />
+    </div>
+    <div id="loginLoading">⏳ Logger inn…</div>
+    <button class="btn btn-green" id="signinBtn">Logg inn 🔐</button>
+    <div class="auth-toggle">
+      Ny bruker?
+      <button class="auth-toggle-btn" id="showSignupBtn">Registrer deg her</button>
+    </div>
+  </div>
+
+  <!-- فورم إنشاء حساب جديد -->
+  <div class="login-box" id="signupBox" style="display:none;">
+    <div class="auth-divider">Ny bruker</div>
     <div>
       <div class="input-label">Ditt navn</div>
-      <input type="text" id="nameInput" placeholder="Ola Nordmann"
+      <input type="text" id="signupName" placeholder="Ola Nordmann"
              autocomplete="name" autocorrect="off" spellcheck="false" />
     </div>
-    <button class="btn btn-green" id="loginBtn">Kom i gang 🚀</button>
+    <div>
+      <div class="input-label">E-post</div>
+      <input type="email" id="signupEmail" placeholder="ola@example.com"
+             autocomplete="email" autocorrect="off" spellcheck="false" />
+    </div>
+    <div>
+      <div class="input-label">Passord</div>
+      <input type="password" id="signupPassword" placeholder="Minst 6 tegn"
+             autocomplete="new-password" />
+    </div>
+    <div id="signupLoading" class="loginLoading" style="display:none;text-align:center;color:var(--muted);font-size:0.9rem;padding:8px;">⏳ Oppretter konto…</div>
+    <button class="btn btn-green" id="signupBtn">Opprett konto 🚀</button>
+    <div class="auth-toggle">
+      Har du konto?
+      <button class="auth-toggle-btn" id="showSigninBtn">Logg inn her</button>
+    </div>
   </div>
 </div>
 
@@ -601,11 +662,10 @@ async function fetchRunnerHistory(runnerId) {
 /* ============================================================
    LOCAL STORAGE
    ============================================================ */
-const LS_RUNNER    = 'loypesjekk_runner';
 const LS_LOG       = 'loypesjekk_log';
 const LS_IOS       = 'loypesjekk_ios_dismissed';
-const LS_CP_TIMES  = 'loypesjekk_cp_times'; // { checkpoint_order: timestamp }
-const COOLDOWN_MS  = 60 * 60 * 1000;        // ساعة لكل نقطة
+const LS_CP_TIMES  = 'loypesjekk_cp_times';
+const COOLDOWN_MS  = 60 * 60 * 1000;
 
 function getCpTimes() {
   try { return JSON.parse(localStorage.getItem(LS_CP_TIMES)) || {}; } catch { return {}; }
@@ -620,9 +680,9 @@ function cpOnCooldown(order) {
   return t && (Date.now() - t) < COOLDOWN_MS;
 }
 
-const getRunner    = () => { try { return JSON.parse(localStorage.getItem(LS_RUNNER)); } catch { return null; } };
-const saveRunner   = r  => localStorage.setItem(LS_RUNNER, JSON.stringify(r));
-const clearRunner  = () => localStorage.removeItem(LS_RUNNER);
+// المستخدم الحالي من Supabase Auth
+let currentUser = null; // { id, name, email }
+
 const getLocalLog  = () => { try { return JSON.parse(localStorage.getItem(LS_LOG)) || []; } catch { return []; } };
 
 function appendLocalLog(entry) {
@@ -917,7 +977,7 @@ function closeDrawer() {
 }
 
 async function loadDrawerHistory() {
-  const runner = getRunner();
+  const runner = currentUser;
   if (!runner) return;
 
   document.getElementById('drawerRunnerName').textContent = runner.name;
@@ -961,7 +1021,7 @@ async function loadDrawerHistory() {
    REGISTRATION
    ============================================================ */
 async function registerPosition() {
-  const runner = getRunner();
+  const runner = currentUser;
   if (!runner) return;
 
   const btn = document.getElementById('registerBtn');
@@ -1057,34 +1117,94 @@ async function registerPosition() {
 }
 
 /* ============================================================
-   LOGIN
+   AUTH — تسجيل دخول وإنشاء حساب عبر Supabase
    ============================================================ */
-function generateId() {
-  return 'r_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+function showSigninForm() {
+  document.getElementById('signinBox').style.display  = '';
+  document.getElementById('signupBox').style.display  = 'none';
+}
+function showSignupForm() {
+  document.getElementById('signinBox').style.display  = 'none';
+  document.getElementById('signupBox').style.display  = '';
 }
 
-async function handleLogin() {
-  const input = document.getElementById('nameInput');
-  const name  = (input.value || '').trim();
-  if (name.length < 2) { showToast('⚠️ Skriv inn et navn (minst 2 tegn)', 't-warn'); input.focus(); return; }
-  const runner = { id: generateId(), name };
-  saveRunner(runner);
-  await saveRunnerToSupabase(runner.id, runner.name);
-  startMainScreen(runner);
+async function handleSignin() {
+  const email    = (document.getElementById('signinEmail').value    || '').trim();
+  const password = (document.getElementById('signinPassword').value || '').trim();
+  if (!email || !password) { showToast('⚠️ Fyll inn e-post og passord', 't-warn'); return; }
+
+  document.getElementById('loginLoading').classList.add('visible');
+  document.getElementById('signinBtn').disabled = true;
+
+  try {
+    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    await onAuthSuccess(data.user);
+  } catch(e) {
+    showToast('❌ ' + (e.message || 'Innlogging feilet'), 't-error', 5000);
+  } finally {
+    document.getElementById('loginLoading').classList.remove('visible');
+    document.getElementById('signinBtn').disabled = false;
+  }
 }
 
-function handleReset() {
-  if (!confirm('Vil du logge ut og starte på nytt?')) return;
-  clearRunner();
-  trackPoints = [];
-  document.getElementById('nameInput').value = '';
+async function handleSignup() {
+  const name     = (document.getElementById('signupName').value     || '').trim();
+  const email    = (document.getElementById('signupEmail').value    || '').trim();
+  const password = (document.getElementById('signupPassword').value || '').trim();
+
+  if (name.length < 2)   { showToast('⚠️ Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
+  if (!email)             { showToast('⚠️ Skriv inn e-post', 't-warn'); return; }
+  if (password.length < 6){ showToast('⚠️ Passordet må ha minst 6 tegn', 't-warn'); return; }
+
+  document.getElementById('signupLoading').style.display = 'block';
+  document.getElementById('signupBtn').disabled = true;
+
+  try {
+    const { data, error } = await sbClient.auth.signUp({
+      email, password,
+      options: { data: { full_name: name } },
+    });
+    if (error) throw error;
+    // احفظ الاسم في runners table
+    await saveRunnerToSupabase(data.user.id, name);
+    await onAuthSuccess(data.user, name);
+  } catch(e) {
+    showToast('❌ ' + (e.message || 'Registrering feilet'), 't-error', 5000);
+  } finally {
+    document.getElementById('signupLoading').style.display = 'none';
+    document.getElementById('signupBtn').disabled = false;
+  }
+}
+
+async function onAuthSuccess(user, nameOverride) {
+  // جلب الاسم من runners table أو من metadata
+  let name = nameOverride || user.user_metadata?.full_name || '';
+  if (!name) {
+    try {
+      const { data } = await sbClient.from('runners').select('name').eq('id', user.id).single();
+      if (data?.name) name = data.name;
+    } catch {}
+  }
+  if (!name) name = user.email.split('@')[0];
+
+  currentUser = { id: user.id, name, email: user.email };
+  startMainScreen(currentUser);
+}
+
+async function handleSignout() {
+  if (!confirm('Vil du logge ut?')) return;
+  await sbClient.auth.signOut();
+  currentUser  = null;
+  trackPoints  = [];
+  showSigninForm();
   showScreen('loginScreen');
 }
 
 async function startMainScreen(runner) {
-  document.getElementById('headerRaceName').textContent  = CONFIG.RACE_NAME;
+  document.getElementById('headerRaceName').textContent   = CONFIG.RACE_NAME;
   document.getElementById('headerRunnerName').textContent = runner.name;
-  document.getElementById('loginTitle').textContent      = CONFIG.RACE_NAME;
+  document.getElementById('loginTitle').textContent       = CONFIG.RACE_NAME;
 
   showScreen('mainScreen');
 
@@ -1142,9 +1262,16 @@ function init() {
 
   document.getElementById('loginTitle').textContent = CONFIG.RACE_NAME;
 
-  document.getElementById('loginBtn').addEventListener('click', handleLogin);
-  document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
-  document.getElementById('ikkeDegBtn').addEventListener('click', handleReset);
+  // Auth buttons
+  document.getElementById('signinBtn').addEventListener('click', handleSignin);
+  document.getElementById('signupBtn').addEventListener('click', handleSignup);
+  document.getElementById('showSignupBtn').addEventListener('click', showSignupForm);
+  document.getElementById('showSigninBtn').addEventListener('click', showSigninForm);
+  document.getElementById('ikkeDegBtn').addEventListener('click', handleSignout);
+
+  // Enter key على حقول الإدخال
+  document.getElementById('signinPassword').addEventListener('keydown', e => { if (e.key === 'Enter') handleSignin(); });
+  document.getElementById('signupPassword').addEventListener('keydown', e => { if (e.key === 'Enter') handleSignup(); });
   document.getElementById('registerBtn').addEventListener('click', registerPosition);
   document.getElementById('gpsRetryBtn').addEventListener('click', () => { hideGpsOverlay(); startGPS(); });
 
@@ -1153,9 +1280,27 @@ function init() {
   document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
 
-  const runner = getRunner();
-  if (runner?.id && runner?.name) startMainScreen(runner);
-  else showScreen('loginScreen');
+  // تحقق من جلسة موجودة — إذا موجودة يدخل مباشرة بدون تسجيل دخول
+  try {
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (session?.user) {
+      await onAuthSuccess(session.user);
+    } else {
+      showScreen('loginScreen');
+    }
+  } catch {
+    showScreen('loginScreen');
+  }
+
+  // استمع لتغييرات الجلسة (logout من تبويب آخر مثلاً)
+  sbClient.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      trackPoints = [];
+      showSigninForm();
+      showScreen('loginScreen');
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
