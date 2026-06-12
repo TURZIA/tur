@@ -19,6 +19,8 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet-src.min.js"></script>
   <!-- Excel export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -569,6 +571,10 @@
     <div id="rapportResult"></div>
 
     <button class="btn btn-green" id="genRapportBtn">📥 Last ned Excel-rapport</button>
+    <button class="btn" id="sendRapportBtn"
+      style="background:#3B82F6;color:#fff;margin-top:-8px;">
+      📧 Send til e-post
+    </button>
 
   </div>
 </div>
@@ -619,7 +625,10 @@ const CONFIG = {
   SUPABASE_URL:      'https://lbzvvcggisehfasvxmcm.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxienZ2Y2dnaXNlaGZhc3Z4bWNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTg2MTgsImV4cCI6MjA5NjgzNDYxOH0.2J6xazbbbKbvMOxPP-ILIcZev-6o17aAYxZH0gONbb4',
 
-  ADMIN_EMAIL: 'ziadnasif77@gmail.com',   // فقط هذا الإيميل يرى زر التقرير
+  ADMIN_EMAIL:       'ziadnasif77@gmail.com', // فقط هذا الإيميل يرى زر التقرير
+  EMAILJS_SERVICE:   'service_mf2avgt',
+  EMAILJS_TEMPLATE:  'template_64ke7fc',
+  EMAILJS_PUBLIC_KEY:'VrIDl9-cEJGl6LTAY',
 
   RACE_NAME: 'Toppløpet',
   RACE_ID:   'topploepet-2025',
@@ -1365,59 +1374,23 @@ async function generateRapport() {
   const resultEl = document.getElementById('rapportResult');
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div>';
-  resultEl.className = '';
   resultEl.style.display = 'none';
 
   try {
-    const fra = getDateFromSelects('fra');
-    const til = getDateFromSelects('til');
-    til.setHours(23, 59, 59, 999);
+    const result = await fetchRapportData();
+    if (!result) return;
+    const { data, fra, til } = result;
 
-    if (fra > til) {
-      showToast('⚠️ Fra-dato må være før til-dato', 't-warn');
-      return;
-    }
-
-    const { data, error } = await sbClient
-      .from('check_ins')
-      .select('runner_name, checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, elapsed_seconds, timestamp, race_id')
-      .gte('timestamp', fra.toISOString())
-      .lte('timestamp', til.toISOString())
-      .order('timestamp', { ascending: true });
-
-    if (error) throw error;
-    if (!data || data.length === 0) {
+    if (data.length === 0) {
       resultEl.textContent = 'Ingen registreringer i denne perioden.';
       resultEl.className = 'visible error';
       resultEl.style.display = 'block';
       return;
     }
 
-    // بناء صفوف Excel
-    const rows = data.map(r => ({
-      'Navn':             r.runner_name || '',
-      'Sjekkpunkt nr':    r.checkpoint_order || '',
-      'Sjekkpunkt navn':  r.checkpoint_name  || '',
-      'Dato':             new Date(r.timestamp).toLocaleDateString('nb-NO'),
-      'Klokkeslett':      new Date(r.timestamp).toLocaleTimeString('nb-NO'),
-      'Tid fra forrige (sek)': r.elapsed_seconds ?? '',
-      'Breddegrad':       r.lat_recorded  || '',
-      'Lengdegrad':       r.lng_recorded  || '',
-      'GPS nøyaktighet (m)': r.accuracy_meters || '',
-      'Løp ID':           r.race_id || '',
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    // عرض الأعمدة
-    ws['!cols'] = [
-      {wch:20},{wch:14},{wch:24},{wch:12},{wch:12},
-      {wch:22},{wch:14},{wch:14},{wch:20},{wch:16},
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Rapport');
-
     const fraStr = fra.toLocaleDateString('nb-NO').replace(/\./g,'-');
     const tilStr = til.toLocaleDateString('nb-NO').replace(/\./g,'-');
+    const wb = buildWorkbook(data);
     XLSX.writeFile(wb, `Rapport_${fraStr}_til_${tilStr}.xlsx`);
 
     resultEl.textContent = `✅ ${data.length} registreringer lastet ned.`;
@@ -1429,6 +1402,115 @@ async function generateRapport() {
   } finally {
     btn.disabled = false;
     btn.textContent = '📥 Last ned Excel-rapport';
+  }
+}
+
+async function fetchRapportData() {
+  const fra = getDateFromSelects('fra');
+  const til = getDateFromSelects('til');
+  til.setHours(23, 59, 59, 999);
+  if (fra > til) {
+    showToast('⚠️ Fra-dato må være før til-dato', 't-warn');
+    return null;
+  }
+  const { data, error } = await sbClient
+    .from('check_ins')
+    .select('runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
+    .gte('timestamp', fra.toISOString())
+    .lte('timestamp', til.toISOString())
+    .order('timestamp', { ascending: true });
+  if (error) throw error;
+  return { data: data || [], fra, til };
+}
+
+function buildWorkbook(data) {
+  const rows = data.map(r => ({
+    'Navn':                   r.runner_name      || '',
+    'Sjekkpunkt nr':          r.checkpoint_order || '',
+    'Sjekkpunkt navn':        r.checkpoint_name  || '',
+    'Dato':                   new Date(r.timestamp).toLocaleDateString('nb-NO'),
+    'Klokkeslett':            new Date(r.timestamp).toLocaleTimeString('nb-NO'),
+    'Tid fra forrige (sek)':  r.elapsed_seconds  ?? '',
+    'Breddegrad':             r.lat_recorded     || '',
+    'Lengdegrad':             r.lng_recorded     || '',
+    'GPS nøyaktighet (m)':    r.accuracy_meters  || '',
+    'Løp ID':                 r.race_id          || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:20},{wch:14},{wch:24},{wch:12},{wch:12},{wch:22},{wch:14},{wch:14},{wch:20},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rapport');
+  return wb;
+}
+
+async function sendRapportEmail() {
+  const btn = document.getElementById('sendRapportBtn');
+  const resultEl = document.getElementById('rapportResult');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  resultEl.style.display = 'none';
+
+  try {
+    const result = await fetchRapportData();
+    if (!result) return;
+    const { data, fra, til } = result;
+
+    if (data.length === 0) {
+      resultEl.textContent = 'Ingen registreringer i denne perioden.';
+      resultEl.className = 'visible error';
+      resultEl.style.display = 'block';
+      return;
+    }
+
+    const fraStr = fra.toLocaleDateString('nb-NO');
+    const tilStr = til.toLocaleDateString('nb-NO');
+
+    // بناء جدول HTML للإيميل
+    const tableRows = data.map(r =>
+      `<tr>
+        <td>${r.runner_name||''}</td>
+        <td>${r.checkpoint_order||''}</td>
+        <td>${r.checkpoint_name||''}</td>
+        <td>${new Date(r.timestamp).toLocaleDateString('nb-NO')}</td>
+        <td>${new Date(r.timestamp).toLocaleTimeString('nb-NO')}</td>
+        <td>${r.elapsed_seconds != null ? r.elapsed_seconds + ' sek' : '—'}</td>
+      </tr>`
+    ).join('');
+
+    const tableHtml = `
+      <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-family:sans-serif;font-size:13px;">
+        <thead style="background:#1D9E75;color:#fff;">
+          <tr><th>Navn</th><th>Nr</th><th>Sjekkpunkt</th><th>Dato</th><th>Tid</th><th>Fra forrige</th></tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>`;
+
+    // أرسل الإيميل
+    emailjs.init(CONFIG.EMAILJS_PUBLIC_KEY);
+    await emailjs.send(CONFIG.EMAILJS_SERVICE, CONFIG.EMAILJS_TEMPLATE, {
+      title:   `Rapport ${fraStr} – ${tilStr}`,
+      name:    currentUser.name,
+      fra:     fraStr,
+      til:     tilStr,
+      count:   data.length,
+      message: tableHtml,
+      email:   currentUser.email,
+    });
+
+    // نزّل Excel أيضاً
+    const wb = buildWorkbook(data);
+    XLSX.writeFile(wb, `Rapport_${fraStr.replace(/\./g,'-')}_til_${tilStr.replace(/\./g,'-')}.xlsx`);
+
+    resultEl.textContent = `✅ E-post sendt til ${CONFIG.ADMIN_EMAIL} — ${data.length} registreringer`;
+    resultEl.className = 'visible';
+    resultEl.style.display = 'block';
+
+  } catch(e) {
+    showToast('❌ ' + (e?.text || e?.message || 'Sending feilet'), 't-error', 6000);
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📧 Send til e-post';
   }
 }
 
@@ -1506,6 +1588,7 @@ async function init() {
   document.getElementById('rapportBtn').addEventListener('click', openRapportScreen);
   document.getElementById('rapportBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
+  document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
 
   // تحقق من جلسة موجودة — إذا موجودة يدخل مباشرة بدون تسجيل دخول
   try {
