@@ -107,6 +107,7 @@
     .btn:active { transform: scale(0.97); }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .btn-green { background: var(--green); color: #fff; }
+    .btn-gray  { background: #9CA3AF; color: #fff; cursor: not-allowed; }
 
     /* ===== MAIN SCREEN ===== */
     #mainScreen { gap: 0; overflow: hidden; }
@@ -192,7 +193,7 @@
       box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
       z-index: 10;
     }
-    #registerBtn { min-height: 64px; font-size: 1.15rem; border-radius: 14px; }
+    #registerBtn { min-height: 64px; font-size: 1.15rem; border-radius: 14px; transition: background 0.3s; }
 
     /* Spinner */
     .spinner {
@@ -415,7 +416,7 @@
   </div>
 
   <div class="register-wrap">
-    <button class="btn btn-green" id="registerBtn">Registrer posisjon 📍</button>
+    <button class="btn btn-gray" id="registerBtn">Henter posisjon…</button>
   </div>
 </div>
 
@@ -469,31 +470,31 @@ const CONFIG = {
   RACE_ID:   'topploepet-2025',
 
   // سett true عند يوم السباق بعد تحديد الإحداثيات الحقيقية
-  VERIFY_LOCATION:     false,
-  MAX_DISTANCE_METERS: 5,
+  VERIFY_LOCATION:     true,
+  MAX_DISTANCE_METERS: 10,
 
-  // 20 نقطة افتراضية — استبدل lat/lng بالإحداثيات الحقيقية
+  // 20 نقطة على شارع كارل يوهان في أوسلو — للاختبار
   CHECKPOINTS: [
-    { order: 1,  name: 'NP-1 — Start',          lat: 59.91000, lng: 10.75000 },
-    { order: 2,  name: 'NP-2 — Skogsbrynet',     lat: 59.91500, lng: 10.75400 },
-    { order: 3,  name: 'NP-3 — Bekkekorset',     lat: 59.92100, lng: 10.75900 },
-    { order: 4,  name: 'NP-4 — Furuhøgda',       lat: 59.92700, lng: 10.76300 },
-    { order: 5,  name: 'NP-5 — Stien sørover',   lat: 59.93200, lng: 10.76800 },
-    { order: 6,  name: 'NP-6 — Vann ved dammen', lat: 59.93800, lng: 10.77200 },
-    { order: 7,  name: 'NP-7 — Steinrøysa',      lat: 59.94400, lng: 10.77700 },
-    { order: 8,  name: 'NP-8 — Åsryggen',        lat: 59.95000, lng: 10.78100 },
-    { order: 9,  name: 'NP-9 — Grantoppen',      lat: 59.95600, lng: 10.78600 },
-    { order: 10, name: 'NP-10 — Fjellplatå',     lat: 59.96200, lng: 10.79000 },
-    { order: 11, name: 'NP-11 — Utsiktspunktet', lat: 59.96800, lng: 10.79500 },
-    { order: 12, name: 'NP-12 — Nordskråningen', lat: 59.97300, lng: 10.79900 },
-    { order: 13, name: 'NP-13 — Torvmyra',       lat: 59.97900, lng: 10.80400 },
-    { order: 14, name: 'NP-14 — Elvesvingen',    lat: 59.98500, lng: 10.80800 },
-    { order: 15, name: 'NP-15 — Bjørkehagen',    lat: 59.99100, lng: 10.81300 },
-    { order: 16, name: 'NP-16 — Kolskrenten',    lat: 59.99700, lng: 10.81700 },
-    { order: 17, name: 'NP-17 — Lisiden ned',    lat: 60.00200, lng: 10.82200 },
-    { order: 18, name: 'NP-18 — Grusveien',      lat: 60.00800, lng: 10.82600 },
-    { order: 19, name: 'NP-19 — Siste bakken',   lat: 60.01400, lng: 10.83100 },
-    { order: 20, name: 'NP-20 — Mål',            lat: 60.02000, lng: 10.83500 },
+    { order: 1,  name: 'NP-1 — Oslo S (start)',       lat: 59.91110, lng: 10.75280 },
+    { order: 2,  name: 'NP-2 — Jernbanetorget',       lat: 59.91141, lng: 10.75145 },
+    { order: 3,  name: 'NP-3 — Biskop Gunnerus gt',   lat: 59.91171, lng: 10.75010 },
+    { order: 4,  name: 'NP-4 — Kirkeristen',          lat: 59.91202, lng: 10.74876 },
+    { order: 5,  name: 'NP-5 — Akersgata',            lat: 59.91232, lng: 10.74741 },
+    { order: 6,  name: 'NP-6 — Kongens gate',         lat: 59.91263, lng: 10.74606 },
+    { order: 7,  name: 'NP-7 — Lille Grensen',        lat: 59.91293, lng: 10.74472 },
+    { order: 8,  name: 'NP-8 — Grensen',              lat: 59.91324, lng: 10.74337 },
+    { order: 9,  name: 'NP-9 — Rosenkrantz gt',       lat: 59.91354, lng: 10.74202 },
+    { order: 10, name: 'NP-10 — Stortinget',          lat: 59.91385, lng: 10.74068 },
+    { order: 11, name: 'NP-11 — Universitetsplassen', lat: 59.91415, lng: 10.73933 },
+    { order: 12, name: 'NP-12 — Universitetsgata',    lat: 59.91446, lng: 10.73798 },
+    { order: 13, name: 'NP-13 — Nationaltheatret',    lat: 59.91476, lng: 10.73664 },
+    { order: 14, name: 'NP-14 — Ruseløkkveien',       lat: 59.91507, lng: 10.73529 },
+    { order: 15, name: 'NP-15 — Arbinsgate',          lat: 59.91537, lng: 10.73394 },
+    { order: 16, name: 'NP-16 — Parkveien',           lat: 59.91568, lng: 10.73260 },
+    { order: 17, name: 'NP-17 — Wergelandsveien',     lat: 59.91598, lng: 10.73125 },
+    { order: 18, name: 'NP-18 — Observatoriegata',    lat: 59.91629, lng: 10.72990 },
+    { order: 19, name: 'NP-19 — Slottsparken',        lat: 59.91659, lng: 10.72856 },
+    { order: 20, name: 'NP-20 — Slottet (mål)',       lat: 59.91690, lng: 10.72721 },
   ],
 };
 
@@ -758,11 +759,34 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
 /* ============================================================
    GPS — TRACKING
    ============================================================ */
+function updateRegisterButton(lat, lng) {
+  const btn = document.getElementById('registerBtn');
+  if (btn.disabled) return; // under registrering — ikke endre
+
+  if (!CONFIG.VERIFY_LOCATION || CONFIG.CHECKPOINTS.length === 0) {
+    btn.className = 'btn btn-green';
+    btn.textContent = 'Registrer posisjon 📍';
+    return;
+  }
+
+  const { checkpoint, distance } = findNearestCheckpoint(lat, lng);
+  if (distance <= CONFIG.MAX_DISTANCE_METERS) {
+    btn.className = 'btn btn-green';
+    btn.textContent = `Registrer posisjon 📍`;
+    btn.title = `Nær ${checkpoint.name} (${Math.round(distance)} m)`;
+  } else {
+    btn.className = 'btn btn-gray';
+    btn.textContent = `${Math.round(distance)} m fra nærmeste punkt`;
+    btn.title = '';
+  }
+}
+
 function onGpsSuccess(position) {
   hideGpsOverlay();
   const { latitude: lat, longitude: lng, accuracy: acc } = position.coords;
 
   updateMapPosition(lat, lng);
+  updateRegisterButton(lat, lng);
 
   if (acc <= 20)      setGpsBar('green',  `GPS OK — nøyaktighet ±${Math.round(acc)} m`);
   else if (acc <= 60) setGpsBar('yellow', `GPS svak — nøyaktighet ±${Math.round(acc)} m`);
@@ -891,6 +915,8 @@ async function registerPosition() {
   if (!runner) return;
 
   const btn = document.getElementById('registerBtn');
+  if (btn.classList.contains('btn-gray')) return; // بعيد عن النقطة — لا تسجّل
+
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div>';
 
@@ -969,7 +995,13 @@ async function registerPosition() {
     else showToast('❌ GPS-feil: ' + (err.message || 'ukjent'), 't-error', 5000);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Registrer posisjon 📍';
+    // أعد تقييم حالة الزر بناءً على الموقع الحالي
+    if (positionMarker) {
+      const ll = positionMarker.getLatLng();
+      updateRegisterButton(ll.lat, ll.lng);
+    } else {
+      btn.innerHTML = 'Registrer posisjon 📍';
+    }
   }
 }
 
