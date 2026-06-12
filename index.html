@@ -1935,9 +1935,11 @@ async function fetchRapportData() {
     showToast('Fra-dato må være før til-dato', 't-warn');
     return null;
   }
+  const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
   const { data, error } = await sbClient
     .from('check_ins')
     .select('runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
+    .eq('race_id', raceId)
     .gte('timestamp', fra.toISOString())
     .lte('timestamp', til.toISOString())
     .order('timestamp', { ascending: true });
