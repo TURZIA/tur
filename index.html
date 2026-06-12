@@ -715,8 +715,10 @@ let activePulseMarker = null;
 let activePulseOrder  = null;
 let lastTrackedPos    = null;   // آخر موقع أُضيف للمسار
 let bestRecentPos     = null;   // أدق موقع من آخر 10 ثوانٍ (للتسجيل)
+let smoothedPos       = null;   // موقع مُمهَّد بـ EMA
 
-const MIN_MOVE_METERS = 4;      // لا تحدّث المسار إلا إذا تحركت أكثر من 4م
+const SMOOTH_ALPHA     = 0.5;   // سرعة التمهيد: 0.3=ناعم بطيء، 0.7=سريع
+const MIN_TRACK_METERS = 2;     // أضف للمسار فقط إذا تحركت >2م
 
 const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
 
@@ -1013,25 +1015,31 @@ function stopPulse() {
 function updateMapPosition(lat, lng, accuracy) {
   if (!leafletMap) return;
 
-  // احفظ أدق قراءة من آخر 10 ثوانٍ للاستخدام عند التسجيل
-  if (!bestRecentPos || accuracy <= bestRecentPos.accuracy) {
-    bestRecentPos = { lat, lng, accuracy, ts: Date.now() };
-  }
-  // أعد تصفير bestRecentPos كل 10 ثوانٍ
-  if (Date.now() - bestRecentPos.ts > 10000) {
+  // احفظ أدق قراءة من آخر 10 ثوانٍ للتسجيل
+  if (!bestRecentPos || accuracy <= bestRecentPos.accuracy
+      || Date.now() - bestRecentPos.ts > 10000) {
     bestRecentPos = { lat, lng, accuracy, ts: Date.now() };
   }
 
-  // لا تضف للمسار إلا إذا تحركت فعلياً أكثر من MIN_MOVE_METERS
-  if (lastTrackedPos) {
-    const moved = haversineMeters(lastTrackedPos[0], lastTrackedPos[1], lat, lng);
-    if (moved < MIN_MOVE_METERS) return; // drift — تجاهل
+  // تمهيد الموقع بـ EMA — يجعل الحركة سلسة بدون قفز
+  if (!smoothedPos) {
+    smoothedPos = { lat, lng };
+  } else {
+    smoothedPos.lat = SMOOTH_ALPHA * lat + (1 - SMOOTH_ALPHA) * smoothedPos.lat;
+    smoothedPos.lng = SMOOTH_ALPHA * lng + (1 - SMOOTH_ALPHA) * smoothedPos.lng;
   }
 
-  lastTrackedPos = [lat, lng];
-  trackPoints.push([lat, lng]);
-  liveTrackLine.setLatLngs(trackPoints);
-  saveTrack();
+  const sLat = smoothedPos.lat;
+  const sLng = smoothedPos.lng;
+
+  // أضف للمسار فقط إذا تحركت >2م من آخر نقطة مسجّلة
+  if (!lastTrackedPos ||
+      haversineMeters(lastTrackedPos[0], lastTrackedPos[1], sLat, sLng) >= MIN_TRACK_METERS) {
+    lastTrackedPos = [sLat, sLng];
+    trackPoints.push([sLat, sLng]);
+    liveTrackLine.setLatLngs(trackPoints);
+    saveTrack();
+  }
 
   if (!positionMarker) {
     positionMarker = L.circleMarker([lat, lng], {
@@ -1040,9 +1048,9 @@ function updateMapPosition(lat, lng, accuracy) {
       zIndexOffset: 1000,
     }).addTo(leafletMap);
     positionMarker.bindTooltip('موقعك الحالي', { permanent: false });
-    leafletMap.setView([lat, lng], 15);
+    leafletMap.setView([sLat, sLng], 15);
   } else {
-    positionMarker.setLatLng([lat, lng]);
+    positionMarker.setLatLng([sLat, sLng]);
   }
 }
 
