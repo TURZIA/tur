@@ -429,6 +429,15 @@
     .date-row {
       display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
     }
+    /* Leaderboard */
+    .lb-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+    .lb-table th { background:var(--green); color:#fff; padding:8px 10px; text-align:left; font-weight:600; }
+    .lb-table td { padding:8px 10px; border-bottom:1px solid var(--border); }
+    .lb-table tr:nth-child(even) td { background:#f3faf7; }
+    .lb-winner td { background:#d1fae5 !important; font-weight:700; }
+    .lb-rank { font-weight:800; font-size:1rem; color:var(--green); }
+    .lb-title { font-size:1rem; font-weight:700; margin-bottom:10px; color:var(--text); }
+    .lb-sub { font-size:0.8rem; color:var(--muted); margin-bottom:12px; }
     .date-row label {
       font-size: 0.75rem; font-weight: 600; color: var(--muted);
       display: block; margin-bottom: 4px;
@@ -655,8 +664,9 @@
     </div>
 
     <div id="rapportResult"></div>
+    <div id="leaderboard" style="display:none;margin-top:12px;"></div>
 
-    <button class="btn btn-green" id="genRapportBtn">📥 Last ned Excel-rapport</button>
+    <button class="btn btn-green" id="genRapportBtn">Last ned Excel-rapport</button>
     <button class="btn" id="sendRapportBtn"
       style="background:#3B82F6;color:#fff;margin-top:-8px;">
       Send til e-post
@@ -1714,12 +1724,69 @@ async function generateRapport() {
     resultEl.className = 'visible';
     resultEl.style.display = 'block';
 
+    buildLeaderboard(data);
+
   } catch(e) {
     showToast('' + (e.message || 'Feil ved henting av data'), 't-error', 5000);
   } finally {
     btn.disabled = false;
-    btn.textContent = '📥 Last ned Excel-rapport';
+    btn.textContent = 'Last ned Excel-rapport';
   }
+}
+
+function buildLeaderboard(data) {
+  const total = CONFIG.CHECKPOINTS.length;
+  const runners = {};
+
+  data.forEach(row => {
+    const name = row.runner_name;
+    if (!runners[name]) runners[name] = { name, cps: {}, first: null, last: null };
+    const r = runners[name];
+    const order = row.checkpoint_order;
+    const ts = new Date(row.timestamp);
+    if (!r.cps[order] || ts < new Date(r.cps[order])) r.cps[order] = row.timestamp;
+    if (!r.first || ts < new Date(r.first)) r.first = row.timestamp;
+    if (!r.last  || ts > new Date(r.last))  r.last  = row.timestamp;
+  });
+
+  const list = Object.values(runners).map(r => {
+    const count = Object.keys(r.cps).length;
+    const secs  = r.first && r.last
+      ? Math.round((new Date(r.last) - new Date(r.first)) / 1000)
+      : null;
+    return { name: r.name, count, secs };
+  });
+
+  list.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return (a.secs ?? Infinity) - (b.secs ?? Infinity);
+  });
+
+  const fmt = s => {
+    if (s === null) return '—';
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+    return h > 0 ? `${h}t ${m}m ${sec}s` : `${m}m ${sec}s`;
+  };
+
+  const el = document.getElementById('leaderboard');
+  el.innerHTML = `
+    <div class="lb-title">Resultater</div>
+    <div class="lb-sub">${list.length} deltakere — ${total} sjekkpunkter totalt</div>
+    <table class="lb-table">
+      <thead><tr>
+        <th>#</th><th>Navn</th><th>Sjekkpunkter</th><th>Total tid</th>
+      </tr></thead>
+      <tbody>
+        ${list.map((r, i) => `
+          <tr class="${r.count === total ? 'lb-winner' : ''}">
+            <td class="lb-rank">${i + 1}</td>
+            <td>${r.name}</td>
+            <td>${r.count} / ${total}</td>
+            <td>${fmt(r.secs)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+  el.style.display = 'block';
 }
 
 async function fetchRapportData() {
@@ -1806,6 +1873,7 @@ async function sendRapportEmail() {
     resultEl.textContent = `E-post sendt til ${CONFIG.ADMIN_EMAIL} — ${data.length} registreringer`;
     resultEl.className = 'visible';
     resultEl.style.display = 'block';
+    buildLeaderboard(data);
 
   } catch(e) {
     showToast('' + (e?.text || e?.message || 'Sending feilet'), 't-error', 6000);
