@@ -1714,6 +1714,7 @@ async function onAuthSuccess(user, nameOverride) {
 
 async function handleSignout() {
   if (!confirm('Vil du logge ut?')) return;
+  if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
   await sbClient.auth.signOut();
   currentUser  = null;
   trackPoints  = [];
@@ -1730,13 +1731,64 @@ async function startMainScreen(runner) {
 
   showScreen('mainScreen');
 
-  // تهيئة الخريطة بعد ظهور الشاشة
   setTimeout(() => {
     initMap();
     loadPreviousRegistrationsOnMap(runner.id);
     startGPS();
     initCompass();
+    startRealtime(runner);
   }, 150);
+}
+
+/* ============================================================
+   REALTIME — live updates from Supabase
+   ============================================================ */
+let realtimeChannel = null;
+
+function startRealtime(runner) {
+  if (!sbClient) return;
+  if (realtimeChannel) sbClient.removeChannel(realtimeChannel);
+
+  const raceId = runner.adminCode || CONFIG.RACE_ID;
+
+  realtimeChannel = sbClient
+    .channel('live-updates')
+
+    // Ny innsjekking fra hvem som helst → oppdater kartet
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'check_ins',
+      filter: `race_id=eq.${raceId}`,
+    }, payload => {
+      const row = payload.new;
+      // Marker nåværende brukers sjekkpunkt som fullført
+      if (row.runner_id === runner.id && row.checkpoint_order) {
+        markCheckpointDone(row.checkpoint_order);
+      }
+      // Oppdater historikk-skuff hvis åpen
+      if (document.getElementById('historyDrawer').classList.contains('open') &&
+          row.runner_id === runner.id) {
+        loadHistoryDrawer(runner.id);
+      }
+    })
+
+    // Nytt sjekkpunkt lagt til av admin → oppdater kart
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'checkpoints',
+      filter: `race_id=eq.${raceId}`,
+    }, async () => {
+      await loadCheckpointsFromSupabase(raceId);
+      rebuildMapMarkers();
+    })
+
+    // Sjekkpunkt slettet → oppdater kart
+    .on('postgres_changes', {
+      event: 'DELETE', schema: 'public', table: 'checkpoints',
+    }, async () => {
+      await loadCheckpointsFromSupabase(raceId);
+      rebuildMapMarkers();
+    })
+
+    .subscribe();
 }
 
 /* ============================================================
