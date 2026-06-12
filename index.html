@@ -1881,9 +1881,22 @@ async function init() {
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
 
+  // إذا كان اللينك منتهي الصلاحية → أظهر رسالة واضحة
+  if (window.location.hash.includes('error=access_denied') || window.location.hash.includes('otp_expired')) {
+    showScreen('loginScreen');
+    showResetForm();
+    setTimeout(() => {
+      const msg = document.getElementById('resetMsg');
+      showMsg(msg, '⚠️ Lenken er utløpt. Send en ny tilbakestillingslenke.', 'amber');
+    }, 200);
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
+
   // إذا كان اللينك من إيميل reset password أو رابط مباشر
   if (window.location.hash.includes('type=recovery') || window.location.hash === '#reset') {
     showScreen('resetPasswordScreen');
+    history.replaceState(null, '', window.location.pathname);
     return;
   }
 
