@@ -840,17 +840,6 @@
     <!-- نقاط السباق المختار -->
     <div id="cpAdminList"></div>
 
-    <!-- إضافة نقطة للسباق المختار -->
-    <div class="rapport-card" id="cpAddForm">
-      <div class="rapport-card-title">Legg til sjekkpunkt</div>
-      <div class="input-label">Navn</div>
-      <input type="text" id="cpNewName" placeholder="f.eks. Toppen" autocorrect="off" />
-      <div class="input-label" style="margin-top:10px;">Koordinater</div>
-      <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
-      <button class="btn btn-green" id="cpAddBtn" style="margin-top:12px;">+ Legg til</button>
-      <div id="cpAddMsg" class="form-msg" style="display:none;"></div>
-    </div>
-
   </div>
 </div>
 
@@ -2761,40 +2750,6 @@ async function renderCpAdminList() {
   } catch(e) { el.innerHTML = '<div style="color:var(--red);">Feil ved lasting.</div>'; }
 }
 
-async function addCheckpoint() {
-  const name   = document.getElementById('cpNewName').value.trim();
-  const coords = document.getElementById('cpNewCoords').value.trim();
-  const msg    = document.getElementById('cpAddMsg');
-  const btn    = document.getElementById('cpAddBtn');
-
-  if (!name)   { showMsg(msg, 'Skriv inn et navn', 'amber'); return; }
-  if (!coords) { showMsg(msg, 'Skriv inn koordinater eller lim inn en Google Maps-lenke', 'amber'); return; }
-
-  const pos = parseCoordsFromText(coords);
-  if (!pos) { showMsg(msg, 'Ugyldig koordinater — bruk f.eks. 59.9510 10.7732', 'red'); return; }
-
-  const raceId = _cpAdminRaceId();
-  if (!raceId) { showMsg(msg, 'Velg et løp først', 'amber'); return; }
-  const { data: existing } = await sbClient.from('checkpoints')
-    .select('cp_order').eq('race_id', raceId)
-    .order('cp_order', { ascending: false }).limit(1);
-  const nextOrder = existing && existing.length > 0 ? existing[0].cp_order + 1 : 1;
-
-  const { error } = await sbClient.from('checkpoints').insert({
-    race_id: raceId, cp_order: nextOrder,
-    name, lat: pos.lat, lng: pos.lng,
-  });
-  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
-
-  document.getElementById('cpNewName').value   = '';
-  document.getElementById('cpNewCoords').value = '';
-  showMsg(msg, `Sjekkpunkt ${nextOrder} lagt til!`, 'green');
-  await renderCpAdminList();
-  await loadCheckpointsFromSupabase();
-  rebuildMapMarkers();
-  if (currentUser?.id) await loadPreviousRegistrationsOnMap(currentUser.id);
-  drawRaceRoute();
-}
 
 function _clearRaceRoute() {
   raceRouteSegments.forEach(p => leafletMap && leafletMap.removeLayer(p));
@@ -3027,7 +2982,6 @@ async function init() {
   document.getElementById('rapportBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
   document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
-  document.getElementById('cpAddBtn').addEventListener('click', addCheckpoint);
   document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', openNewRaceScreen);
   // صفحة الإنشاء الجديدة
   document.getElementById('cpNewRaceBackBtn').addEventListener('click', async () => {
