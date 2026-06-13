@@ -807,7 +807,7 @@
       </div>
       <div>
         <div class="input-label">Koordinater (desimal eller grader)</div>
-        <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732  eller  59°57\'03.5"N 10°46\'23.7"E' autocorrect="off" autocapitalize="off" />
+        <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732  eller  Google Maps-lenke' autocorrect="off" autocapitalize="off" />
       </div>
       <button class="btn btn-green" id="cpAddBtn">+ Legg til</button>
       <div id="cpAddMsg" class="form-msg" style="display:none;"></div>
@@ -2256,11 +2256,19 @@ async function addAdmin() {
    CHECKPOINT ADMIN
    ============================================================ */
 function parseDMS(str) {
-  // Prøv desimalformat: "59.9510 10.7732"
+  // Google Maps URL: @lat,lng  eller  q=lat,lng  eller  ll=lat,lng
+  const gmaps = str.match(/[@?&](?:q|ll)?=?(-?\d+\.\d+),(-?\d+\.\d+)|@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (gmaps) {
+    const lat = parseFloat(gmaps[1] || gmaps[3]);
+    const lng = parseFloat(gmaps[2] || gmaps[4]);
+    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+  }
+
+  // Desimalformat: "59.9510 10.7732"
   const dec = str.trim().match(/^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/);
   if (dec) return { lat: parseFloat(dec[1]), lng: parseFloat(dec[2]) };
 
-  // Prøv grader-format: 59°57'03.5"N 10°46'23.7"E
+  // Grader-format: 59°57'03.5"N 10°46'23.7"E
   const dms = str.match(/(\d+)[°]\s*(\d+)[''']\s*([\d.]+)["""]\s*([NS])\s+(\d+)[°]\s*(\d+)[''']\s*([\d.]+)["""]\s*([EW])/i);
   if (dms) {
     let lat = +dms[1] + +dms[2]/60 + +dms[3]/3600;
