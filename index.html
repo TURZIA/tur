@@ -856,7 +856,6 @@
       <div class="rapport-card-title">Løpsnavn</div>
       <input type="text" id="cpNRName" placeholder="f.eks. Oslo Maraton" autocorrect="off" />
       <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">Opprett løp</button>
-      <div id="cpNRMsg" class="form-msg" style="display:none; margin-top:8px;"></div>
     </div>
 
     <!-- إضافة نقاط للسباق الجديد -->
@@ -867,7 +866,6 @@
       <div class="input-label" style="margin-top:10px;">Koordinater</div>
       <input type="text" id="cpNRCpCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
       <button class="btn btn-green" id="cpNRAddCpBtn" style="margin-top:12px;">+ Legg til</button>
-      <div id="cpNRCpMsg" class="form-msg" style="display:none;"></div>
     </div>
 
     <!-- قائمة النقاط المضافة -->
@@ -2627,21 +2625,18 @@ function openNewRaceScreen() {
   showScreen('cpNewRaceScreen');
   _cpNRCurrentRaceId = null;
   document.getElementById('cpNRName').value    = '';
-  document.getElementById('cpNRMsg').style.display    = 'none';
   document.getElementById('cpNRAddForm').style.display   = 'none';
   document.getElementById('cpNRCpList').innerHTML        = '';
-  document.getElementById('cpNRCpMsg').style.display     = 'none';
   document.getElementById('cpNRCreateBtn').disabled      = false;
   setTimeout(() => document.getElementById('cpNRName').focus(), 200);
 }
 
 async function createRace() {
   const name = document.getElementById('cpNRName').value.trim();
-  const msg  = document.getElementById('cpNRMsg');
-  if (!name) { showMsg(msg, 'Skriv inn et løpsnavn', 'amber'); return; }
+  if (!name) { showToast('Skriv inn et løpsnavn', 't-warn'); return; }
 
   const adminCode = currentUser?.adminCode;
-  if (!adminCode) { showMsg(msg, 'Ingen admin-kode funnet', 'red'); return; }
+  if (!adminCode) { showToast('Ingen admin-kode funnet', 't-error'); return; }
 
   const btn = document.getElementById('cpNRCreateBtn');
   btn.disabled = true;
@@ -2655,23 +2650,21 @@ async function createRace() {
   }
 
   const { error } = await sbClient.from('races').insert({ admin_code: adminCode, race_id, name });
-  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); btn.disabled = false; return; }
+  if (error) { showToast('Feil: ' + error.message, 't-error'); btn.disabled = false; return; }
 
   _cpNRCurrentRaceId = race_id;
   document.getElementById('cpNRAddForm').style.display  = '';
   document.getElementById('cpNRName').disabled          = true;
   btn.textContent = '✓ Opprettet';
-  showMsg(msg, `Løp «${name}» er klar — legg til sjekkpunkter nedenfor`, 'green');
 }
 
 async function addCpToNewRace() {
   if (!_cpNRCurrentRaceId) return;
   const name   = document.getElementById('cpNRCpName').value.trim();
   const coords = document.getElementById('cpNRCpCoords').value.trim();
-  const msg    = document.getElementById('cpNRCpMsg');
-  if (!name)   { showMsg(msg, 'Skriv inn navn', 'amber'); return; }
+  if (!name)   { showToast('Skriv inn navn', 't-warn'); return; }
   const pos = parseCoordsFromText(coords);
-  if (!pos)  { showMsg(msg, 'Ugyldig koordinater', 'red'); return; }
+  if (!pos)  { showToast('Ugyldig koordinater', 't-error'); return; }
 
   const { data: ex } = await sbClient.from('checkpoints')
     .select('cp_order').eq('race_id', _cpNRCurrentRaceId)
