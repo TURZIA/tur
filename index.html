@@ -1054,9 +1054,10 @@ async function saveCheckInToSupabase(entry) {
 async function fetchLastCheckIn(runnerId) {
   if (!sbClient) return null;
   try {
+    const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
     const { data } = await sbClient
       .from('check_ins').select('timestamp')
-      .eq('runner_id', runnerId).eq('race_id', CONFIG.RACE_ID)
+      .eq('runner_id', runnerId).eq('race_id', raceId)
       .order('timestamp', { ascending: false }).limit(1).single();
     return data || null;
   } catch { return null; }
@@ -1084,13 +1085,16 @@ const LS_IOS       = 'loypesjekk_ios_dismissed';
 const LS_CP_TIMES  = 'loypesjekk_cp_times';
 const COOLDOWN_MS  = 60 * 60 * 1000;
 
+function _cpTimesKey() {
+  return LS_CP_TIMES + '_' + (currentUser?.adminCode || CONFIG.RACE_ID);
+}
 function getCpTimes() {
-  try { return JSON.parse(localStorage.getItem(LS_CP_TIMES)) || {}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(_cpTimesKey())) || {}; } catch { return {}; }
 }
 function setCpTime(order) {
   const times = getCpTimes();
   times[order] = Date.now();
-  localStorage.setItem(LS_CP_TIMES, JSON.stringify(times));
+  localStorage.setItem(_cpTimesKey(), JSON.stringify(times));
 }
 function cpOnCooldown(order) {
   const t = getCpTimes()[order];
@@ -1509,7 +1513,7 @@ function updateCompass(lat, lng) {
   if (!leafletMap) return;
 
   const now = Date.now();
-  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  const cpTimes = getCpTimes();
 
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
@@ -1538,7 +1542,7 @@ function updateCompass(lat, lng) {
     if (_osrmTarget?.order !== target.order) return;
 
     // Sjekk at målet ikke ble registrert mens vi ventet
-    const fresh = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+    const fresh = getCpTimes();
     if (fresh[target.order] && (Date.now() - fresh[target.order]) < COOLDOWN_MS) return;
 
     // Nå er vi klare til å tegne — slett gammelt
@@ -1574,7 +1578,7 @@ function _routeBearingFromPosition(lat, lng) {
   if (!cached?.segments) return null;
 
   const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
-  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  const cpTimes = getCpTimes();
 
   // Finn første uferdige segment
   let segIdx = 0;
@@ -1607,7 +1611,7 @@ function _updateCompassArrow() {
   if (_compassUserLat === null) { widget.classList.add('inactive'); return; }
 
   const now = Date.now();
-  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  const cpTimes = getCpTimes();
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
     const t = cpTimes[cp.order];
@@ -1783,6 +1787,11 @@ async function registerPosition() {
       return;
     }
 
+    if (nearestCp && cpOnCooldown(nearestCp.order)) {
+      showToast(`${nearestCp.name} er allerede registrert`, 't-warn', 3000);
+      return;
+    }
+
     const nowIso = new Date().toISOString();
     let elapsedSeconds = null;
 
@@ -1940,14 +1949,14 @@ async function handleSignup() {
   const password  = (document.getElementById('signupPassword').value  || '').trim();
   const adminCode = (document.getElementById('signupAdminCode').value || '').trim();
 
-  if (name.length < 2)   { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
-  if (!adminCode)        { showToast('Skriv inn admin-koden fra arrangøren', 't-warn'); return; }
+  if (name.length < 2)    { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
+  if (!email)             { showToast('Skriv inn e-post', 't-warn'); return; }
+  if (password.length < 6){ showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
+  if (!adminCode)         { showToast('Skriv inn admin-koden fra arrangøren', 't-warn'); return; }
 
   // Verifiser at admin-koden finnes
   const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).single();
-  if (!adminRow)         { showToast('Ugyldig admin-kode — sjekk med arrangøren', 't-error', 5000); return; }
-  if (!email)             { showToast('Skriv inn e-post', 't-warn'); return; }
-  if (password.length < 6){ showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
+  if (!adminRow)          { showToast('Ugyldig admin-kode — sjekk med arrangøren', 't-error', 5000); return; }
 
   document.getElementById('signupLoading').style.display = 'block';
   document.getElementById('signupBtn').disabled = true;
@@ -1972,10 +1981,13 @@ async function onAuthSuccess(user, nameOverride) {
   let name = nameOverride || user.user_metadata?.full_name || '';
   let adminCode = null;
 
+  let runnerAdminCode = null;  // السباق الذي يشارك فيه الراكض
+  let adminOwnCode    = null;  // السباق الذي يديره كأدمن
+
   try {
     const { data } = await sbClient.from('runners').select('name,admin_code').eq('id', user.id).single();
     if (data?.name && !name) name = data.name;
-    if (data?.admin_code) adminCode = data.admin_code;
+    if (data?.admin_code) runnerAdminCode = data.admin_code;
   } catch {}
 
   if (!name) name = user.email.split('@')[0];
@@ -1986,8 +1998,11 @@ async function onAuthSuccess(user, nameOverride) {
   let isAdmin = isSuperAdmin;
   if (!isSuperAdmin) {
     const { data: aRow } = await sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).single();
-    if (aRow) { isAdmin = true; adminCode = aRow.admin_code; }
+    if (aRow) { isAdmin = true; adminOwnCode = aRow.admin_code; }
   }
+
+  // الأدمن يستخدم كوده الخاص للإدارة؛ الراكض العادي يستخدم كود السباق المسجّل فيه
+  adminCode = adminOwnCode || runnerAdminCode;
 
   currentUser = { id: user.id, name, email: user.email, adminCode };
 
@@ -2002,10 +2017,12 @@ async function onAuthSuccess(user, nameOverride) {
 async function handleSignout() {
   if (!confirm('Vil du logge ut?')) return;
   if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+  // مسح بيانات الجلسة قبل تغيير currentUser حتى نحصل على المفتاح الصح
+  localStorage.removeItem(_cpTimesKey());
+  localStorage.removeItem(LS_TRACK);
   await sbClient.auth.signOut();
   currentUser  = null;
   trackPoints  = [];
-  localStorage.removeItem(LS_TRACK);
   stopPulse();
   showSigninForm();
   showScreen('loginScreen');
@@ -2019,9 +2036,9 @@ async function startMainScreen(runner) {
   showScreen('mainScreen');
   initCompass();   // start tidlig så iOS-tillatelse er klar
 
-  setTimeout(() => {
+  setTimeout(async () => {
     initMap();
-    loadPreviousRegistrationsOnMap(runner.id);
+    await loadPreviousRegistrationsOnMap(runner.id);
     startGPS();
     startRealtime(runner);
     drawRaceRoute();
@@ -2553,7 +2570,7 @@ function _clearRaceRoute() {
 
 function _drawSegments(cps, segments) {
   _clearRaceRoute();
-  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  const cpTimes = getCpTimes();
   segments.forEach((points, i) => {
     if (!points || points.length < 2) return;
     const line = L.polyline(points, {
