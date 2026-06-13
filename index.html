@@ -561,7 +561,7 @@
       border: 2px solid rgba(255,255,255,1);
       backdrop-filter: blur(6px);
     }
-    #compassWidget.inactive { opacity: 0.55; }
+    #compassWidget.inactive { opacity: 0.4; }
     #compassArrow { transition: transform 0.25s ease-out; display: block; }
 
     /* ===== IOS BANNER ===== */
@@ -1564,9 +1564,10 @@ let _compassUserLng = null;
 function _updateCompassArrow() {
   const widget = document.getElementById('compassWidget');
   const arrow  = document.getElementById('compassArrow');
-  if (!widget || !arrow || _compassUserLat === null) {
-    widget?.classList.add('inactive'); return;
-  }
+  if (!widget || !arrow) return;
+
+  // Ingen GPS ennå → vis inaktiv men synlig
+  if (_compassUserLat === null) { widget.classList.add('inactive'); return; }
 
   const now = Date.now();
   const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
@@ -1582,9 +1583,7 @@ function _updateCompassArrow() {
 
   widget.classList.remove('inactive');
   const bearing = _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
-  // Hvis heading er tilgjengelig: roter relativt til enhetsretning
-  // Ellers: vis absolutt kompassretning (nord = opp)
-  const rotate = _compassHeading !== null
+  const rotate  = _compassHeading !== null
     ? (bearing - _compassHeading + 360) % 360
     : bearing;
   arrow.style.transform = `rotate(${rotate}deg)`;
@@ -1977,12 +1976,12 @@ async function startMainScreen(runner) {
   document.getElementById('loginTitle').textContent       = CONFIG.RACE_NAME;
 
   showScreen('mainScreen');
+  initCompass();   // start tidlig så iOS-tillatelse er klar
 
   setTimeout(() => {
     initMap();
     loadPreviousRegistrationsOnMap(runner.id);
     startGPS();
-    initCompass();
     startRealtime(runner);
     drawRaceRoute();
   }, 150);
