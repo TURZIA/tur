@@ -711,9 +711,15 @@
              autocomplete="new-password" />
     </div>
     <div>
-      <div class="input-label">Admin-kode (får du av arrangøren)</div>
-      <input type="text" id="signupAdminCode" placeholder="f.eks. 4821"
+      <div class="input-label">Løpskode (får du av arrangøren)</div>
+      <input type="text" id="signupRaceCode" placeholder="Skriv inn løpskode"
              autocomplete="off" autocorrect="off" autocapitalize="none" />
+    </div>
+    <div id="signupRacePickerDiv" style="display:none;">
+      <div class="input-label">Velg løp</div>
+      <select id="signupRacePicker" class="form-select">
+        <option value="">-- Velg løp --</option>
+      </select>
     </div>
     <div id="signupLoading" class="loginLoading" style="display:none;text-align:center;color:var(--muted);font-size:0.9rem;padding:8px;">Oppretter konto…</div>
     <button class="btn btn-green" id="signupBtn">Opprett konto</button>
@@ -821,17 +827,22 @@
     <span class="rapport-title">Rediger sjekkpunkter</span>
   </div>
   <div class="rapport-body">
-    <!-- اختيار السباق للسوبر أدمن فقط -->
-    <div class="rapport-card" id="cpRaceSelectCard" style="display:none;">
-      <div class="rapport-card-title">Velg sjekkpunkt-løp</div>
-      <select id="cpRaceSelect" class="form-select">
+    <!-- Race selector for all admins (and super admin) -->
+    <div class="rapport-card">
+      <div class="rapport-card-title">Løp</div>
+      <select id="cpRaceSelect" class="form-select" style="margin-bottom:10px;">
         <option value="">-- Velg løp --</option>
       </select>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="cpNewRaceName" placeholder="Nytt løpsnavn…" autocorrect="off" style="flex:1;" />
+        <button class="btn btn-green" id="cpAddRaceBtn" style="white-space:nowrap;padding:10px 14px;">+ Nytt løp</button>
+      </div>
+      <div id="cpRaceMsg" class="form-msg" style="display:none;margin-top:8px;"></div>
     </div>
 
     <div id="cpAdminList"></div>
 
-    <!-- Legg til skjema -->
+    <!-- Add checkpoint form -->
     <div class="rapport-card" id="cpAddForm">
       <div class="rapport-card-title">Legg til sjekkpunkt</div>
       <div>
@@ -1030,11 +1041,11 @@ function initSupabase() {
   } catch(e) { console.error('Supabase init:', e); sbClient = null; }
 }
 
-async function saveRunnerToSupabase(id, name, adminCode) {
+async function saveRunnerToSupabase(id, name, raceId) {
   if (!sbClient) return;
   try {
     const row = { id, name, created_at: new Date().toISOString() };
-    if (adminCode) row.admin_code = adminCode;
+    if (raceId) row.race_id = raceId;
     await sbClient.from('runners').upsert(
       row,
       { onConflict: 'id', ignoreDuplicates: false }
@@ -1955,16 +1966,50 @@ async function handleSignup() {
   const name      = (document.getElementById('signupName').value      || '').trim();
   const email     = (document.getElementById('signupEmail').value     || '').trim();
   const password  = (document.getElementById('signupPassword').value  || '').trim();
-  const adminCode = (document.getElementById('signupAdminCode').value || '').trim();
+  const raceCode  = (document.getElementById('signupRaceCode').value  || '').trim();
+  const pickerVal = (document.getElementById('signupRacePicker').value || '').trim();
 
   if (name.length < 2)    { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
   if (!email)             { showToast('Skriv inn e-post', 't-warn'); return; }
   if (password.length < 6){ showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
-  if (!adminCode)         { showToast('Skriv inn admin-koden fra arrangøren', 't-warn'); return; }
+  if (!raceCode)          { showToast('Skriv inn løpskoden fra arrangøren', 't-warn'); return; }
 
-  // Verifiser at admin-koden finnes
-  const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).single();
-  if (!adminRow)          { showToast('Ugyldig admin-kode — sjekk med arrangøren', 't-error', 5000); return; }
+  // Determine the race_id to use
+  let selectedRaceId = null;
+
+  // If picker is visible and has a value, use it
+  if (pickerVal) {
+    selectedRaceId = pickerVal;
+  } else {
+    // Try to find by race_id directly
+    const { data: raceRow } = await sbClient.from('races').select('race_id,name').eq('race_id', raceCode).eq('is_active', true).single();
+    if (raceRow) {
+      selectedRaceId = raceRow.race_id;
+    } else {
+      // Try admin_code → show race picker
+      const { data: races } = await sbClient.from('races').select('race_id,name').eq('admin_code', raceCode).eq('is_active', true).order('created_at');
+      if (!races || races.length === 0) {
+        showToast('Ugyldig kode — sjekk med arrangøren', 't-error', 5000);
+        return;
+      }
+      if (races.length === 1) {
+        selectedRaceId = races[0].race_id;
+      } else {
+        // Show picker
+        const picker = document.getElementById('signupRacePicker');
+        const div    = document.getElementById('signupRacePickerDiv');
+        picker.innerHTML = '<option value="">-- Velg løp --</option>';
+        races.forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r.race_id; opt.textContent = r.name;
+          picker.appendChild(opt);
+        });
+        div.style.display = '';
+        showToast('Velg et løp fra listen', 't-warn');
+        return;
+      }
+    }
+  }
 
   document.getElementById('signupLoading').style.display = 'block';
   document.getElementById('signupBtn').disabled = true;
@@ -1975,7 +2020,7 @@ async function handleSignup() {
       options: { data: { full_name: name } },
     });
     if (error) throw error;
-    await saveRunnerToSupabase(data.user.id, name, adminCode);
+    await saveRunnerToSupabase(data.user.id, name, selectedRaceId);
     await onAuthSuccess(data.user, name);
   } catch(e) {
     showToast('' + (e.message || 'Registrering feilet'), 't-error', 5000);
@@ -1993,9 +2038,9 @@ async function onAuthSuccess(user, nameOverride) {
   let adminOwnCode    = null;  // السباق الذي يديره كأدمن
 
   try {
-    const { data } = await sbClient.from('runners').select('name,admin_code').eq('id', user.id).single();
+    const { data } = await sbClient.from('runners').select('name,race_id').eq('id', user.id).single();
     if (data?.name && !name) name = data.name;
-    if (data?.admin_code) runnerAdminCode = data.admin_code;
+    if (data?.race_id) runnerAdminCode = data.race_id;
   } catch {}
 
   if (!name) name = user.email.split('@')[0];
@@ -2235,12 +2280,7 @@ async function fetchRapportData() {
   const selectedCode = document.getElementById('adminSelect')?.value;
   const raceId = isSuperAdmin
     ? (selectedCode || null)
-    : (currentUser?.adminCode || CONFIG.RACE_ID);
-
-  if (isSuperAdmin && !selectedCode) {
-    showToast('Velg en admin først', 't-warn');
-    return null;
-  }
+    : (selectedCode || currentUser?.adminCode || CONFIG.RACE_ID);
 
   let query = sbClient
     .from('check_ins')
@@ -2368,6 +2408,18 @@ async function openRapportScreen() {
       opt.textContent = `${a.email} (${a.admin_code})${a.is_active ? '' : ' — deaktivert'}`;
       sel.appendChild(opt);
     });
+  } else if (currentUser?.adminCode) {
+    // Regular admin: show their races
+    card.style.display = '';
+    const { data: myRaces } = await sbClient.from('races').select('race_id,name').eq('admin_code', currentUser.adminCode).eq('is_active', true).order('created_at');
+    sel.innerHTML = '<option value="">-- Alle løp --</option>';
+    (myRaces || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.race_id; opt.textContent = r.name;
+      sel.appendChild(opt);
+    });
+    // Auto-select if only one race
+    if (myRaces?.length === 1) sel.value = myRaces[0].race_id;
   } else {
     card.style.display = 'none';
   }
@@ -2504,31 +2556,72 @@ async function loadCheckpointsFromSupabase(adminCode) {
 }
 
 function _cpAdminRaceId() {
-  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-  if (isSuperAdmin) return document.getElementById('cpRaceSelect')?.value || null;
-  return currentUser?.adminCode || CONFIG.RACE_ID;
+  return document.getElementById('cpRaceSelect')?.value || null;
 }
 
 async function openCpAdminScreen() {
   showScreen('cpAdminScreen');
-  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-  const card = document.getElementById('cpRaceSelectCard');
-  const sel  = document.getElementById('cpRaceSelect');
+  await _loadCpRaceDropdown();
+  await renderCpAdminList();
+}
 
-  if (isSuperAdmin) {
-    card.style.display = '';
-    const { data } = await sbClient.from('admins').select('email,admin_code').eq('is_active', true).order('created_at');
-    sel.innerHTML = '<option value="">-- Velg løp --</option>';
-    (data || []).forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a.admin_code;
-      opt.textContent = `${a.email} (${a.admin_code})`;
-      sel.appendChild(opt);
-    });
-    sel.onchange = () => renderCpAdminList();
-  } else {
-    card.style.display = 'none';
+async function _loadCpRaceDropdown() {
+  const sel = document.getElementById('cpRaceSelect');
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+
+  let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
+  if (!isSuperAdmin) {
+    query = query.eq('admin_code', currentUser.adminCode);
   }
+  const { data } = await query;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Velg løp --</option>';
+  (data || []).forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.race_id;
+    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})` : r.name;
+    sel.appendChild(opt);
+  });
+  // restore previous selection if still valid
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  sel.onchange = () => renderCpAdminList();
+}
+
+async function createRace() {
+  const nameInput = document.getElementById('cpNewRaceName');
+  const name = nameInput.value.trim();
+  const msg  = document.getElementById('cpRaceMsg');
+  if (!name) { showMsg(msg, 'Skriv inn et løpsnavn', 'amber'); return; }
+
+  const adminCode = currentUser?.adminCode;
+  if (!adminCode) { showMsg(msg, 'Ingen admin-kode funnet', 'red'); return; }
+
+  // Generate unique race_id
+  let race_id, taken = true;
+  while (taken) {
+    const chars = 'abcdefghjklmnpqrstuvwxyz23456789';
+    race_id = adminCode + '_' + Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    const { data } = await sbClient.from('races').select('id').eq('race_id', race_id);
+    taken = data && data.length > 0;
+  }
+
+  const { error } = await sbClient.from('races').insert({ admin_code: adminCode, race_id, name });
+  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
+
+  nameInput.value = '';
+  showMsg(msg, `Løp opprettet! Kode: ${race_id}`, 'green');
+  await _loadCpRaceDropdown();
+  // Auto-select the new race
+  document.getElementById('cpRaceSelect').value = race_id;
+  await renderCpAdminList();
+}
+
+async function deleteRace(raceId) {
+  if (!confirm('Slett dette løpet? Sjekkpunktene beholdes i databasen.')) return;
+  await sbClient.from('races').update({ is_active: false }).eq('race_id', raceId);
+  // reset dropdown
+  document.getElementById('cpRaceSelect').value = '';
+  await _loadCpRaceDropdown();
   await renderCpAdminList();
 }
 
@@ -2835,6 +2928,7 @@ async function init() {
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
   document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('cpAddBtn').addEventListener('click', addCheckpoint);
+  document.getElementById('cpAddRaceBtn').addEventListener('click', createRace);
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
   document.getElementById('superAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
