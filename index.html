@@ -1564,11 +1564,8 @@ let _compassUserLng = null;
 function _updateCompassArrow() {
   const widget = document.getElementById('compassWidget');
   const arrow  = document.getElementById('compassArrow');
-  if (!widget || !arrow) return;
-
-  // Ingen GPS eller ingen heading → vis inaktiv
-  if (_compassHeading === null || _compassUserLat === null) {
-    widget.classList.add('inactive'); return;
+  if (!widget || !arrow || _compassUserLat === null) {
+    widget?.classList.add('inactive'); return;
   }
 
   const now = Date.now();
@@ -1585,7 +1582,11 @@ function _updateCompassArrow() {
 
   widget.classList.remove('inactive');
   const bearing = _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
-  const rotate  = (bearing - _compassHeading + 360) % 360;
+  // Hvis heading er tilgjengelig: roter relativt til enhetsretning
+  // Ellers: vis absolutt kompassretning (nord = opp)
+  const rotate = _compassHeading !== null
+    ? (bearing - _compassHeading + 360) % 360
+    : bearing;
   arrow.style.transform = `rotate(${rotate}deg)`;
 }
 
@@ -1603,28 +1604,27 @@ function _onDeviceOrientation(e) {
   _updateCompassArrow();
 }
 
+function _startOrientationListeners() {
+  window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
+  window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+}
+
 async function initCompass() {
   const widget = document.getElementById('compassWidget');
   if (!widget) return;
 
-  // iOS 13+ trenger tillatelse
   if (typeof DeviceOrientationEvent !== 'undefined'
       && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    widget.addEventListener('click', async () => {
-      try {
-        const perm = await DeviceOrientationEvent.requestPermission();
-        if (perm === 'granted') {
-          window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
-          window.addEventListener('deviceorientation', _onDeviceOrientation, true);
-        }
-      } catch(e) { console.warn('Kompass-tillatelse nektet'); }
+    // iOS 13+ — trykk for å gi tillatelse
+    widget.addEventListener('click', () => {
+      DeviceOrientationEvent.requestPermission()
+        .then(perm => {
+          if (perm === 'granted') _startOrientationListeners();
+        })
+        .catch(() => {});
     }, { once: true });
-    // Vis et hint om at man trykker for å aktivere
-    widget.title = 'Trykk for å aktivere kompass';
   } else {
-    // Android / andre — start direkte
-    window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
-    window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+    _startOrientationListeners();
   }
 }
 
