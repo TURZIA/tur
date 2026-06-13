@@ -1091,7 +1091,6 @@ function setCpTime(order) {
   const times = getCpTimes();
   times[order] = Date.now();
   localStorage.setItem(LS_CP_TIMES, JSON.stringify(times));
-  updateRaceRouteColors();
 }
 function cpOnCooldown(order) {
   const t = getCpTimes()[order];
@@ -1197,13 +1196,7 @@ function initMap() {
     maxZoom: 19,
   }).addTo(leafletMap);
 
-  // استعد المسار المحفوظ من الجلسة السابقة
-  trackPoints = loadTrack();
-
-  // خط المسار الحي
-  liveTrackLine = L.polyline(trackPoints, {
-    color: '#1D9E75', weight: 3, opacity: 0.8,
-  }).addTo(leafletMap);
+  // Track ikke tegnet — ingen grønn linje
 
   // رسم نقاط السباق الـ 20
   drawCheckpointMarkers();
@@ -1296,7 +1289,6 @@ function updateMapPosition(lat, lng, accuracy) {
       haversineMeters(lastTrackedPos[0], lastTrackedPos[1], sLat, sLng) >= MIN_TRACK_METERS) {
     lastTrackedPos = [sLat, sLng];
     trackPoints.push([sLat, sLng]);
-    liveTrackLine.setLatLngs(trackPoints);
     saveTrack();
   }
 
@@ -2547,27 +2539,15 @@ function _drawSegments(cps, segments) {
   const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
   segments.forEach((points, i) => {
     if (!points || points.length < 2) return;
-    const done = !!cpTimes[cps[i]?.order];
     const line = L.polyline(points, {
-      color:     done ? '#0EA371' : '#F59E0B',
-      weight:    4,
-      opacity:   0.78,
-      dashArray: done ? null : '10 6',
+      color: '#F59E0B', weight: 4, opacity: 0.78, dashArray: '10 6',
     }).addTo(leafletMap);
     line.bringToBack();
     raceRouteSegments.push(line);
   });
 }
 
-function updateRaceRouteColors() {
-  if (!leafletMap || !raceRouteSegments.length) return;
-  const cps     = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
-  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
-  raceRouteSegments.forEach((line, i) => {
-    const done = !!cpTimes[cps[i]?.order];
-    line.setStyle({ color: done ? '#0EA371' : '#F59E0B', dashArray: done ? null : '10 6' });
-  });
-}
+function updateRaceRouteColors() { /* farger er fjernet */ }
 
 async function drawRaceRoute() {
   if (!leafletMap) return;
