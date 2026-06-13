@@ -2556,9 +2556,14 @@ function _drawSegments(cps, segments) {
 
 function updateRaceRouteColors() { /* farger er fjernet */ }
 
+let _drawingRoute = false;
 async function drawRaceRoute() {
-  if (!leafletMap) return;
+  if (!leafletMap || _drawingRoute) return;
+  _drawingRoute = true;
   _clearRaceRoute();
+  try { await _drawRaceRouteInner(); } finally { _drawingRoute = false; }
+}
+async function _drawRaceRouteInner() {
   // Slett også gammelt cache-format
   localStorage.removeItem('raceRoute_v1');
   const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
