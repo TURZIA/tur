@@ -710,7 +710,7 @@
       <input type="password" id="signupPassword" placeholder="Minst 6 tegn"
              autocomplete="new-password" />
     </div>
-    <div>
+    <div id="signupCodeDiv">
       <div class="input-label">Arrangørkode (får du av arrangøren)</div>
       <input type="text" id="signupRaceCode" placeholder="Skriv inn koden"
              autocomplete="off" autocorrect="off" autocapitalize="characters" />
@@ -1990,13 +1990,18 @@ async function handleSignup() {
   if (name.length < 2)     { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
   if (!email)              { showToast('Skriv inn e-post', 't-warn'); return; }
   if (password.length < 6) { showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
-  if (!adminCode)          { showToast('Skriv inn arrangørkoden', 't-warn'); return; }
 
-  // Validate admin code exists
-  const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).eq('is_active', true).single();
-  if (!adminRow) {
-    showToast('Ugyldig arrangørkode — sjekk med arrangøren', 't-error', 5000);
-    return;
+  // Check if this email is already registered as an admin — no code needed
+  const { data: adminEmailRow } = await sbClient.from('admins').select('admin_code').eq('email', email).eq('is_active', true).single();
+  const isAdminSignup = !!adminEmailRow;
+
+  if (!isAdminSignup) {
+    if (!adminCode) { showToast('Skriv inn arrangørkoden', 't-warn'); return; }
+    const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).eq('is_active', true).single();
+    if (!adminRow) {
+      showToast('Ugyldig arrangørkode — sjekk med arrangøren', 't-error', 5000);
+      return;
+    }
   }
 
   document.getElementById('signupLoading').style.display = 'block';
@@ -2008,7 +2013,8 @@ async function handleSignup() {
       options: { data: { full_name: name } },
     });
     if (error) throw error;
-    await saveRunnerToSupabase(data.user.id, name, adminCode);
+    // Admins don't get saved to runners table — they have no race link
+    if (!isAdminSignup) await saveRunnerToSupabase(data.user.id, name, adminCode);
     await onAuthSuccess(data.user, name);
   } catch(e) {
     showToast('' + (e.message || 'Registrering feilet'), 't-error', 5000);
@@ -2965,6 +2971,12 @@ async function init() {
   // Auth buttons
   document.getElementById('signinBtn').addEventListener('click', handleSignin);
   document.getElementById('signupBtn').addEventListener('click', handleSignup);
+  document.getElementById('signupEmail').addEventListener('blur', async () => {
+    const email = (document.getElementById('signupEmail').value || '').trim();
+    if (!email) return;
+    const { data } = await sbClient.from('admins').select('admin_code').eq('email', email).eq('is_active', true).single();
+    document.getElementById('signupCodeDiv').style.display = data ? 'none' : '';
+  });
   document.getElementById('showSignupBtn').addEventListener('click', showSignupForm);
   document.getElementById('showSigninBtn').addEventListener('click', showSigninForm);
   document.getElementById('showResetBtn').addEventListener('click', showResetForm);
