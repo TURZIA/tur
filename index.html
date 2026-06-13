@@ -547,6 +547,24 @@
       border-color: rgba(239,68,68,0.2);
     }
 
+    /* ===== COMPASS WIDGET ===== */
+    #compassWidget {
+      position: absolute;
+      top: 12px; right: 12px;
+      width: 52px; height: 52px;
+      background: rgba(255,255,255,0.92);
+      border-radius: 50%;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 410;
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.9);
+      backdrop-filter: blur(6px);
+      transition: opacity 0.3s;
+    }
+    #compassWidget.hidden { opacity: 0; pointer-events: none; }
+    #compassArrow { transition: transform 0.3s ease-out; display: block; }
+
     /* ===== IOS BANNER ===== */
     #iosBanner {
       display: none; position: fixed;
@@ -755,6 +773,14 @@
   <!-- MAP -->
   <div id="mapContainer">
     <div id="map"></div>
+
+    <!-- COMPASS -->
+    <div id="compassWidget" title="Peker mot nærmeste sjekkpunkt">
+      <svg id="compassArrow" viewBox="0 0 40 40" width="36" height="36">
+        <polygon points="20,4 26,32 20,27 14,32" fill="#FF6B6B" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+        <circle cx="20" cy="20" r="3" fill="white" opacity="0.8"/>
+      </svg>
+    </div>
 
 <div class="map-legend">
       <div class="legend-row"><div class="legend-dot" style="background:#0EA371;border:2px solid #fff;box-shadow:0 0 0 1px #0EA371"></div> Sjekkpunkt</div>
@@ -1363,6 +1389,8 @@ function onGpsSuccess(position) {
   updateRegisterButton(lat, lng);
   checkProximityAlert(lat, lng);
   updateCompass(lat, lng);
+  _compassUserLat = lat; _compassUserLng = lng;
+  _updateCompassArrow();
 
   if (acc <= 20)      setGpsBar('green',  `GPS OK — nøyaktighet ±${Math.round(acc)} m`);
   else if (acc <= 60) setGpsBar('yellow', `GPS svak — nøyaktighet ±${Math.round(acc)} m`);
@@ -1527,7 +1555,79 @@ function updateCompass(lat, lng) {
   }, OSRM_DEBOUNCE);
 }
 
-function initCompass() {}
+/* ============================================================
+   COMPASS WIDGET
+   ============================================================ */
+let _compassHeading = null;   // degrees from north (device heading)
+let _compassUserLat = null;
+let _compassUserLng = null;
+
+function _updateCompassArrow() {
+  const widget = document.getElementById('compassWidget');
+  const arrow  = document.getElementById('compassArrow');
+  if (!widget || !arrow) return;
+
+  if (_compassHeading === null || _compassUserLat === null) {
+    widget.classList.add('hidden'); return;
+  }
+
+  const now = Date.now();
+  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  let target = null, minDist = Infinity;
+  CONFIG.CHECKPOINTS.forEach(cp => {
+    const t = cpTimes[cp.order];
+    if (t && (now - t) < COOLDOWN_MS) return;
+    const d = haversineMeters(_compassUserLat, _compassUserLng, cp.lat, cp.lng);
+    if (d < minDist) { minDist = d; target = cp; }
+  });
+
+  if (!target) { widget.classList.add('hidden'); return; }
+
+  const bearing = _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
+  // Roter pilen: bearing relativt til enhetsretning
+  const rotate  = (bearing - _compassHeading + 360) % 360;
+  arrow.style.transform = `rotate(${rotate}deg)`;
+  widget.classList.remove('hidden');
+}
+
+function _onDeviceOrientation(e) {
+  let heading = null;
+  if (e.webkitCompassHeading !== undefined) {
+    heading = e.webkitCompassHeading;           // iOS: grader fra nord
+  } else if (e.absolute && e.alpha !== null) {
+    heading = (360 - e.alpha) % 360;            // Android absolute
+  } else if (e.alpha !== null) {
+    heading = (360 - e.alpha) % 360;            // fallback
+  }
+  if (heading === null) return;
+  _compassHeading = heading;
+  _updateCompassArrow();
+}
+
+async function initCompass() {
+  const widget = document.getElementById('compassWidget');
+  if (!widget) return;
+
+  // iOS 13+ trenger tillatelse
+  if (typeof DeviceOrientationEvent !== 'undefined'
+      && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    widget.addEventListener('click', async () => {
+      try {
+        const perm = await DeviceOrientationEvent.requestPermission();
+        if (perm === 'granted') {
+          window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
+          window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+        }
+      } catch(e) { console.warn('Kompass-tillatelse nektet'); }
+    }, { once: true });
+    // Vis et hint om at man trykker for å aktivere
+    widget.title = 'Trykk for å aktivere kompass';
+  } else {
+    // Android / andre — start direkte
+    window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
+    window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+  }
+}
 
 /* ============================================================
    FORMAT ELAPSED
