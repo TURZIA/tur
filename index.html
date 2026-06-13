@@ -833,9 +833,24 @@
       <select id="cpRaceSelect" class="form-select" style="margin-bottom:10px;">
         <option value="">-- Velg løp --</option>
       </select>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input type="text" id="cpNewRaceName" placeholder="Nytt løpsnavn…" autocorrect="off" style="flex:1;" />
-        <button class="btn btn-green" id="cpAddRaceBtn" style="white-space:nowrap;padding:10px 14px;">+ Nytt løp</button>
+
+      <!-- معلومات السباق المختار -->
+      <div id="cpRaceInfo" style="display:none; background:var(--green-lt); border:1px solid rgba(14,163,113,0.25); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:10px;">
+        <div style="font-size:0.78rem; color:var(--muted); margin-bottom:4px;">Løpskode (del med deltakerne)</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <code id="cpRaceCode" style="font-size:1rem; font-weight:700; color:var(--green-dk); letter-spacing:1px; flex:1;"></code>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('cpRaceCode').textContent).then(()=>showToast('Kopiert!','t-success',1500))"
+                  style="background:none;border:1px solid var(--green);border-radius:6px;padding:4px 10px;color:var(--green-dk);font-size:0.8rem;cursor:pointer;">Kopier</button>
+          <button id="cpDeleteRaceBtn" style="background:none;border:1px solid var(--red);border-radius:6px;padding:4px 10px;color:var(--red);font-size:0.8rem;cursor:pointer;">Slett løp</button>
+        </div>
+      </div>
+
+      <!-- إنشاء سباق جديد (للأدمن فقط، لا للسوبر أدمن) -->
+      <div id="cpCreateRaceDiv">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="cpNewRaceName" placeholder="Nytt løpsnavn…" autocorrect="off" style="flex:1;" />
+          <button class="btn btn-green" id="cpAddRaceBtn" style="white-space:nowrap;padding:10px 14px;">+ Nytt løp</button>
+        </div>
       </div>
       <div id="cpRaceMsg" class="form-msg" style="display:none;margin-top:8px;"></div>
     </div>
@@ -2566,25 +2581,46 @@ async function openCpAdminScreen() {
 }
 
 async function _loadCpRaceDropdown() {
-  const sel = document.getElementById('cpRaceSelect');
+  const sel          = document.getElementById('cpRaceSelect');
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
 
+  // السوبر أدمن لا يمكنه إنشاء سباقات (ليس لديه adminCode)
+  const createDiv = document.getElementById('cpCreateRaceDiv');
+  if (createDiv) createDiv.style.display = isSuperAdmin ? 'none' : '';
+
   let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
-  if (!isSuperAdmin) {
-    query = query.eq('admin_code', currentUser.adminCode);
-  }
-  const { data } = await query;
+  if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
+  const { data: races } = await query;
+
   const prev = sel.value;
   sel.innerHTML = '<option value="">-- Velg løp --</option>';
-  (data || []).forEach(r => {
+  (races || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.race_id;
     opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})` : r.name;
     sel.appendChild(opt);
   });
-  // restore previous selection if still valid
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
-  sel.onchange = () => renderCpAdminList();
+
+  const _updateRaceInfo = () => {
+    const raceId   = sel.value;
+    const info     = document.getElementById('cpRaceInfo');
+    const codeEl   = document.getElementById('cpRaceCode');
+    const delBtn   = document.getElementById('cpDeleteRaceBtn');
+    if (raceId) {
+      codeEl.textContent = raceId;
+      info.style.display = '';
+      // السوبر أدمن لا يحذف سباقات الآخرين من هنا
+      if (delBtn) delBtn.style.display = isSuperAdmin ? 'none' : '';
+      delBtn.onclick = () => deleteRace(raceId);
+    } else {
+      info.style.display = 'none';
+    }
+    renderCpAdminList();
+  };
+
+  sel.onchange = _updateRaceInfo;
+  _updateRaceInfo(); // تطبيق على القيمة الحالية
 }
 
 async function createRace() {
@@ -2609,11 +2645,11 @@ async function createRace() {
   if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
 
   nameInput.value = '';
-  showMsg(msg, `Løp opprettet! Kode: ${race_id}`, 'green');
+  showMsg(msg, `Løp «${name}» opprettet!`, 'green');
   await _loadCpRaceDropdown();
-  // Auto-select the new race
+  // Auto-select the new race — triggers _updateRaceInfo which shows the code
   document.getElementById('cpRaceSelect').value = race_id;
-  await renderCpAdminList();
+  document.getElementById('cpRaceSelect').dispatchEvent(new Event('change'));
 }
 
 async function deleteRace(raceId) {
