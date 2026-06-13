@@ -2405,6 +2405,7 @@ async function addCheckpoint() {
 function _clearRaceRoute() {
   raceRouteSegments.forEach(p => leafletMap && leafletMap.removeLayer(p));
   raceRouteSegments = [];
+  if (raceRouteLine) { leafletMap && leafletMap.removeLayer(raceRouteLine); raceRouteLine = null; }
 }
 
 function _drawSegments(cps, segments) {
@@ -2436,8 +2437,11 @@ function updateRaceRouteColors() {
 
 async function drawRaceRoute() {
   if (!leafletMap) return;
+  _clearRaceRoute();
+  // Slett også gammelt cache-format
+  localStorage.removeItem('raceRoute_v1');
   const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
-  if (cps.length < 2) { _clearRaceRoute(); return; }
+  if (cps.length < 2) return;
 
   // Cache key = fingerprint av sjekkpunkt-koordinater
   const cacheKey = cps.map(cp => `${cp.lat},${cp.lng}`).join('|');
