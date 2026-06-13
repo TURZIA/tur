@@ -825,62 +825,87 @@
   <div class="rapport-header">
     <button class="rapport-back" id="cpAdminBackBtn">← Tilbake</button>
     <span class="rapport-title">Sjekkpunkter</span>
-    <button id="cpNewRaceHeaderBtn" class="rapport-back" style="margin-left:auto; background:var(--green); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:0.85rem; font-weight:600;">+ Nytt løp</button>
+    <button id="cpNewRaceHeaderBtn" style="margin-left:auto; background:var(--green); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:0.85rem; font-weight:600; cursor:pointer;">+ Nytt løp</button>
   </div>
-
-  <!-- Modal: opprett nytt løp -->
-  <div id="cpNewRaceModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:900; align-items:center; justify-content:center;">
-    <div style="background:#fff; border-radius:var(--radius); padding:24px; margin:20px; width:100%; max-width:360px; box-shadow:var(--shadow-lg);">
-      <div style="font-size:1.05rem; font-weight:700; color:var(--text); margin-bottom:16px;">Nytt løp</div>
-      <div class="input-label">Navn på løpet</div>
-      <input type="text" id="cpModalRaceName" placeholder="f.eks. Oslo Maraton" autocorrect="off" style="margin-bottom:12px;" />
-      <div id="cpModalRaceMsg" class="form-msg" style="display:none; margin-bottom:12px;"></div>
-      <div style="display:flex; gap:10px;">
-        <button class="btn" id="cpModalCancelBtn" style="flex:1; background:var(--bg); color:var(--text-2); border:1px solid var(--border);">Avbryt</button>
-        <button class="btn btn-green" id="cpModalCreateBtn" style="flex:1;">Opprett</button>
-      </div>
-    </div>
-  </div>
-
   <div class="rapport-body">
 
-    <!-- 1. اختيار السباق -->
+    <!-- dropdown السباقات -->
     <div class="rapport-card">
       <div class="rapport-card-title">Velg løp</div>
       <select id="cpRaceSelect" class="form-select">
         <option value="">-- Velg et løp --</option>
       </select>
-      <!-- كود السباق المختار -->
+      <!-- كود السباق -->
       <div id="cpRaceInfo" style="display:none; margin-top:12px; background:var(--green-lt); border:1px solid rgba(14,163,113,0.25); border-radius:var(--radius-sm); padding:12px 14px;">
         <div style="font-size:0.78rem; color:var(--muted); margin-bottom:4px;">Løpskode — del med deltakerne</div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <code id="cpRaceCode" style="font-size:1.05rem; font-weight:700; color:var(--green-dk); letter-spacing:1px; flex:1;"></code>
           <button onclick="navigator.clipboard.writeText(document.getElementById('cpRaceCode').textContent).then(()=>showToast('Kopiert!','t-success',1500))"
                   style="background:none;border:1px solid var(--green);border-radius:6px;padding:5px 12px;color:var(--green-dk);font-size:0.82rem;cursor:pointer;">Kopier</button>
-          <button id="cpDeleteRaceBtn"
-                  style="background:none;border:1px solid var(--red);border-radius:6px;padding:5px 12px;color:var(--red);font-size:0.82rem;cursor:pointer;">Slett løp</button>
+          <button id="cpDeleteRaceBtn" style="background:none;border:1px solid var(--red);border-radius:6px;padding:5px 12px;color:var(--red);font-size:0.82rem;cursor:pointer;">Slett løp</button>
         </div>
       </div>
     </div>
 
-    <div id="cpRaceMsg" class="form-msg" style="display:none;margin-bottom:8px;"></div>
-
-    <!-- 3. نقاط السباق المختار -->
+    <!-- نقاط السباق المختار -->
     <div id="cpAdminList"></div>
 
-    <!-- 4. إضافة نقطة -->
+    <!-- إضافة نقطة للسباق المختار -->
     <div class="rapport-card" id="cpAddForm">
       <div class="rapport-card-title">Legg til sjekkpunkt</div>
-      <div>
-        <div class="input-label">Navn</div>
-        <input type="text" id="cpNewName" placeholder="f.eks. Toppen" autocorrect="off" />
-      </div>
-      <div>
-        <div class="input-label">Koordinater (desimal eller grader)</div>
-        <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
-      </div>
-      <button class="btn btn-green" id="cpAddBtn">+ Legg til</button>
+      <div class="input-label">Navn</div>
+      <input type="text" id="cpNewName" placeholder="f.eks. Toppen" autocorrect="off" />
+      <div class="input-label" style="margin-top:10px;">Koordinater</div>
+      <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
+      <button class="btn btn-green" id="cpAddBtn" style="margin-top:12px;">+ Legg til</button>
       <div id="cpAddMsg" class="form-msg" style="display:none;"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== NYTT LØP SCREEN ===== -->
+<div id="cpNewRaceScreen" class="screen">
+  <div class="rapport-header">
+    <button class="rapport-back" id="cpNewRaceBackBtn">← Tilbake</button>
+    <span class="rapport-title">Nytt løp</span>
+  </div>
+  <div class="rapport-body">
+
+    <!-- اسم السباق الجديد -->
+    <div class="rapport-card">
+      <div class="rapport-card-title">Løpsnavn</div>
+      <input type="text" id="cpNRName" placeholder="f.eks. Oslo Maraton" autocorrect="off" />
+      <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">Opprett løp</button>
+      <div id="cpNRMsg" class="form-msg" style="display:none; margin-top:8px;"></div>
+    </div>
+
+    <!-- كود السباق (يظهر بعد الإنشاء) -->
+    <div id="cpNRCodeCard" class="rapport-card" style="display:none;">
+      <div class="rapport-card-title">Løpskode — del med deltakerne</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <code id="cpNRCode" style="font-size:1.1rem; font-weight:700; color:var(--green-dk); letter-spacing:1px; flex:1;"></code>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('cpNRCode').textContent).then(()=>showToast('Kopiert!','t-success',1500))"
+                style="background:none;border:1px solid var(--green);border-radius:6px;padding:5px 12px;color:var(--green-dk);font-size:0.82rem;cursor:pointer;">Kopier</button>
+      </div>
+    </div>
+
+    <!-- إضافة نقاط للسباق الجديد -->
+    <div class="rapport-card" id="cpNRAddForm" style="display:none;">
+      <div class="rapport-card-title">Legg til sjekkpunkter</div>
+      <div class="input-label">Navn</div>
+      <input type="text" id="cpNRCpName" placeholder="f.eks. Toppen" autocorrect="off" />
+      <div class="input-label" style="margin-top:10px;">Koordinater</div>
+      <input type="text" id="cpNRCpCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
+      <button class="btn btn-green" id="cpNRAddCpBtn" style="margin-top:12px;">+ Legg til</button>
+      <div id="cpNRCpMsg" class="form-msg" style="display:none;"></div>
+    </div>
+
+    <!-- قائمة النقاط المضافة -->
+    <div id="cpNRCpList"></div>
+
+  </div>
+</div>
     </div>
 
   </div>
@@ -2635,30 +2660,32 @@ async function _loadCpRaceDropdown() {
   _updateRaceInfo(); // تطبيق على القيمة الحالية
 }
 
-function _openNewRaceModal() {
-  const modal = document.getElementById('cpNewRaceModal');
-  document.getElementById('cpModalRaceName').value = '';
-  document.getElementById('cpModalRaceMsg').style.display = 'none';
-  modal.style.display = 'flex';
-  setTimeout(() => document.getElementById('cpModalRaceName').focus(), 100);
-}
-function _closeNewRaceModal() {
-  document.getElementById('cpNewRaceModal').style.display = 'none';
+let _cpNRCurrentRaceId = null; // race_id السباق الذي يُنشأ حالياً
+
+function openNewRaceScreen() {
+  showScreen('cpNewRaceScreen');
+  _cpNRCurrentRaceId = null;
+  document.getElementById('cpNRName').value    = '';
+  document.getElementById('cpNRMsg').style.display    = 'none';
+  document.getElementById('cpNRCodeCard').style.display  = 'none';
+  document.getElementById('cpNRAddForm').style.display   = 'none';
+  document.getElementById('cpNRCpList').innerHTML        = '';
+  document.getElementById('cpNRCpMsg').style.display     = 'none';
+  document.getElementById('cpNRCreateBtn').disabled      = false;
+  setTimeout(() => document.getElementById('cpNRName').focus(), 200);
 }
 
 async function createRace() {
-  const nameInput = document.getElementById('cpModalRaceName');
-  const name = nameInput.value.trim();
-  const msg  = document.getElementById('cpModalRaceMsg');
+  const name = document.getElementById('cpNRName').value.trim();
+  const msg  = document.getElementById('cpNRMsg');
   if (!name) { showMsg(msg, 'Skriv inn et løpsnavn', 'amber'); return; }
 
   const adminCode = currentUser?.adminCode;
   if (!adminCode) { showMsg(msg, 'Ingen admin-kode funnet', 'red'); return; }
 
-  const createBtn = document.getElementById('cpModalCreateBtn');
-  createBtn.disabled = true;
+  const btn = document.getElementById('cpNRCreateBtn');
+  btn.disabled = true;
 
-  // Generate unique race_id
   let race_id, taken = true;
   while (taken) {
     const chars = 'abcdefghjklmnpqrstuvwxyz23456789';
@@ -2668,14 +2695,48 @@ async function createRace() {
   }
 
   const { error } = await sbClient.from('races').insert({ admin_code: adminCode, race_id, name });
-  createBtn.disabled = false;
+  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); btn.disabled = false; return; }
+
+  _cpNRCurrentRaceId = race_id;
+  document.getElementById('cpNRCode').textContent       = race_id;
+  document.getElementById('cpNRCodeCard').style.display = '';
+  document.getElementById('cpNRAddForm').style.display  = '';
+  document.getElementById('cpNRName').disabled          = true;
+  btn.textContent = '✓ Opprettet';
+  showMsg(msg, `Løp «${name}» er klar — legg til sjekkpunkter nedenfor`, 'green');
+}
+
+async function addCpToNewRace() {
+  if (!_cpNRCurrentRaceId) return;
+  const name   = document.getElementById('cpNRCpName').value.trim();
+  const coords = document.getElementById('cpNRCpCoords').value.trim();
+  const msg    = document.getElementById('cpNRCpMsg');
+  if (!name)   { showMsg(msg, 'Skriv inn navn', 'amber'); return; }
+  const pos = parseCoordsFromText(coords);
+  if (!pos)  { showMsg(msg, 'Ugyldig koordinater', 'red'); return; }
+
+  const { data: ex } = await sbClient.from('checkpoints')
+    .select('cp_order').eq('race_id', _cpNRCurrentRaceId)
+    .order('cp_order', { ascending: false }).limit(1);
+  const nextOrder = ex && ex.length > 0 ? ex[0].cp_order + 1 : 1;
+
+  const { error } = await sbClient.from('checkpoints').insert({
+    race_id: _cpNRCurrentRaceId, cp_order: nextOrder, name, lat: pos.lat, lng: pos.lng,
+  });
   if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
 
-  _closeNewRaceModal();
-  showToast(`Løp «${name}» opprettet!`, 't-success', 3000);
-  await _loadCpRaceDropdown();
-  document.getElementById('cpRaceSelect').value = race_id;
-  document.getElementById('cpRaceSelect').dispatchEvent(new Event('change'));
+  document.getElementById('cpNRCpName').value   = '';
+  document.getElementById('cpNRCpCoords').value = '';
+  showMsg(msg, `${nextOrder}. ${name} — lagt til!`, 'green');
+
+  // أضف للقائمة بصرياً
+  const li = document.createElement('div');
+  li.className = 'cp-admin-item';
+  li.innerHTML = `<div class="cp-admin-num">${nextOrder}</div>
+    <div class="cp-admin-info"><div class="cp-admin-name">${escHtml(name)}</div>
+    <div class="cp-admin-coords">${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</div></div>`;
+  document.getElementById('cpNRCpList').appendChild(li);
+  document.getElementById('cpNRCpName').focus();
 }
 
 async function deleteRace(raceId) {
@@ -2990,11 +3051,20 @@ async function init() {
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
   document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('cpAddBtn').addEventListener('click', addCheckpoint);
-  document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', _openNewRaceModal);
-  document.getElementById('cpModalCancelBtn').addEventListener('click', _closeNewRaceModal);
-  document.getElementById('cpModalCreateBtn').addEventListener('click', createRace);
-  document.getElementById('cpModalRaceName').addEventListener('keydown', e => { if (e.key === 'Enter') createRace(); });
-  document.getElementById('cpNewRaceModal').addEventListener('click', e => { if (e.target === e.currentTarget) _closeNewRaceModal(); });
+  document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', openNewRaceScreen);
+  // صفحة الإنشاء الجديدة
+  document.getElementById('cpNewRaceBackBtn').addEventListener('click', async () => {
+    await openCpAdminScreen();
+    // إذا أُنشئ سباق، اختره تلقائياً
+    if (_cpNRCurrentRaceId) {
+      document.getElementById('cpRaceSelect').value = _cpNRCurrentRaceId;
+      document.getElementById('cpRaceSelect').dispatchEvent(new Event('change'));
+    }
+  });
+  document.getElementById('cpNRCreateBtn').addEventListener('click', createRace);
+  document.getElementById('cpNRName').addEventListener('keydown', e => { if (e.key === 'Enter') createRace(); });
+  document.getElementById('cpNRAddCpBtn').addEventListener('click', addCpToNewRace);
+  document.getElementById('cpNRCpCoords').addEventListener('keydown', e => { if (e.key === 'Enter') addCpToNewRace(); });
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
   document.getElementById('superAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
