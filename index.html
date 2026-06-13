@@ -2255,14 +2255,14 @@ async function addAdmin() {
 /* ============================================================
    CHECKPOINT ADMIN
    ============================================================ */
-function parseDMS(str) {
-  // Google Maps URL: @lat,lng  eller  q=lat,lng  eller  ll=lat,lng
-  const gmaps = str.match(/[@?&](?:q|ll)?=?(-?\d+\.\d+),(-?\d+\.\d+)|@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (gmaps) {
-    const lat = parseFloat(gmaps[1] || gmaps[3]);
-    const lng = parseFloat(gmaps[2] || gmaps[4]);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-  }
+function parseCoordsFromText(str) {
+  // Google Maps lang URL: @lat,lng
+  const gmaps = str.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (gmaps) return { lat: parseFloat(gmaps[1]), lng: parseFloat(gmaps[2]) };
+
+  // q=lat,lng  eller  ll=lat,lng
+  const qll = str.match(/[?&](?:q|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (qll) return { lat: parseFloat(qll[1]), lng: parseFloat(qll[2]) };
 
   // Desimalformat: "59.9510 10.7732"
   const dec = str.trim().match(/^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/);
@@ -2277,6 +2277,22 @@ function parseDMS(str) {
     if (dms[8].toUpperCase() === 'W') lng = -lng;
     return { lat, lng };
   }
+  return null;
+}
+
+function parseDMS(str) { return parseCoordsFromText(str); }
+
+async function resolveShortGmapsUrl(url) {
+  try {
+    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+    const res  = await fetch(proxy);
+    const html = await res.text();
+    const pos  = parseCoordsFromText(html);
+    if (pos) return pos;
+    // Prøv også å finne i meta redirect / canonical
+    const canon = html.match(/canonical[^>]+href="([^"]+)"/);
+    if (canon) return parseCoordsFromText(canon[1]);
+  } catch(e) { console.warn('resolveShortGmapsUrl feil:', e); }
   return null;
 }
 
@@ -2338,10 +2354,21 @@ async function addCheckpoint() {
   const name   = document.getElementById('cpNewName').value.trim();
   const coords = document.getElementById('cpNewCoords').value.trim();
   const msg    = document.getElementById('cpAddMsg');
+  const btn    = document.getElementById('cpAddBtn');
 
   if (!name)   { showMsg(msg, 'Skriv inn et navn', 'amber'); return; }
-  const pos = parseDMS(coords);
-  if (!pos)    { showMsg(msg, 'Ugyldig koordinater — bruk desimal eller grader-format', 'red'); return; }
+  if (!coords) { showMsg(msg, 'Skriv inn koordinater eller lim inn en Google Maps-lenke', 'amber'); return; }
+
+  btn.disabled = true; btn.textContent = 'Henter koordinater…';
+  let pos = parseCoordsFromText(coords);
+
+  if (!pos && (coords.includes('goo.gl') || coords.includes('maps.app'))) {
+    showMsg(msg, 'Løser opp kort lenke…', 'amber');
+    pos = await resolveShortGmapsUrl(coords);
+  }
+
+  btn.disabled = false; btn.textContent = '+ Legg til';
+  if (!pos) { showMsg(msg, 'Kunne ikke hente koordinater. Prøv å lime inn hele Google Maps-lenken eller skriv koordinater direkte.', 'red'); return; }
 
   const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
   const { data: existing } = await sbClient.from('checkpoints')
