@@ -471,9 +471,9 @@
     }
     .rapport-card {
       background: var(--surface); border-radius: var(--radius);
-      padding: 20px; box-shadow: var(--shadow-sm);
+      padding: 14px 16px; box-shadow: var(--shadow-sm);
       border: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 16px;
+      display: flex; flex-direction: column; gap: 10px;
     }
     .rapport-card-title {
       font-size: 0.75rem; font-weight: 700; color: var(--muted);
@@ -517,6 +517,17 @@
       transition: border-color 0.2s, box-shadow 0.2s;
     }
     .date-row select:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(14,163,113,0.12);
+    }
+    input[type="date"] {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 1rem; font-family: inherit; background: var(--bg); color: var(--text);
+      outline: none; -webkit-appearance: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="date"]:focus {
       border-color: var(--green);
       box-shadow: 0 0 0 3px rgba(14,163,113,0.12);
     }
@@ -786,12 +797,12 @@
 
     <div class="rapport-card">
       <div class="rapport-card-title">Fra dato</div>
-      <input type="date" id="fraDate" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:1rem;background:var(--bg);" />
+      <input type="date" id="fraDate" />
     </div>
 
     <div class="rapport-card">
       <div class="rapport-card-title">Til dato</div>
-      <input type="date" id="tilDate" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:1rem;background:var(--bg);" />
+      <input type="date" id="tilDate" />
     </div>
 
     <div id="rapportResult"></div>
