@@ -1561,12 +1561,44 @@ let _compassHeading = null;   // degrees from north (device heading)
 let _compassUserLat = null;
 let _compassUserLng = null;
 
+function _routeBearingFromPosition(lat, lng) {
+  // Finn nærmeste punkt på veisegmentene og returner retning fremover
+  const cached = (() => {
+    try { return JSON.parse(localStorage.getItem(LS_RACE_ROUTE) || 'null'); } catch { return null; }
+  })();
+  if (!cached?.segments) return null;
+
+  const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
+  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+
+  // Finn første uferdige segment
+  let segIdx = 0;
+  for (let i = 0; i < cps.length - 1; i++) {
+    if (cpTimes[cps[i]?.order]) segIdx = i + 1;
+    else { segIdx = i; break; }
+  }
+
+  const seg = cached.segments[Math.min(segIdx, cached.segments.length - 1)];
+  if (!seg || seg.length < 2) return null;
+
+  // Finn nærmeste punkt på segmentet
+  let bestDist = Infinity, bestIdx = 0;
+  seg.forEach(([slat, slng], i) => {
+    const d = haversineMeters(lat, lng, slat, slng);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  });
+
+  // Ta retning mot neste punkt på ruten (se fremover 3 punkter for stabilitet)
+  const ahead = Math.min(bestIdx + 3, seg.length - 1);
+  if (ahead === bestIdx) return null;
+  return _bearing(seg[bestIdx][0], seg[bestIdx][1], seg[ahead][0], seg[ahead][1]);
+}
+
 function _updateCompassArrow() {
   const widget = document.getElementById('compassWidget');
   const arrow  = document.getElementById('compassArrow');
   if (!widget || !arrow) return;
 
-  // Ingen GPS ennå → vis inaktiv men synlig
   if (_compassUserLat === null) { widget.classList.add('inactive'); return; }
 
   const now = Date.now();
@@ -1582,8 +1614,12 @@ function _updateCompassArrow() {
   if (!target) { widget.classList.add('inactive'); return; }
 
   widget.classList.remove('inactive');
-  const bearing = _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
-  const rotate  = _compassHeading !== null
+
+  // Prøv å følge veien — fallback til rett linje mot checkpoint
+  const routeBearing = _routeBearingFromPosition(_compassUserLat, _compassUserLng);
+  const bearing = routeBearing ?? _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
+
+  const rotate = _compassHeading !== null
     ? (bearing - _compassHeading + 360) % 360
     : bearing;
   arrow.style.transform = `rotate(${rotate}deg)`;
