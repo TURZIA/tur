@@ -1432,8 +1432,63 @@ function findNearestCheckpoint(lat, lng) {
 /* ============================================================
    MAP ARROW — from blue dot to nearest unregistered checkpoint
    ============================================================ */
-let arrowLine = null;   // L.polyline الخط
-let arrowHead = null;   // L.marker رأس السهم (SVG icon)
+let arrowLine = null;   // L.polyline or L.layerGroup (route)
+let arrowHead = null;   // L.marker رأس السهم
+
+// OSRM debounce
+let _osrmTarget = null, _osrmTimer = null, _osrmLastLat = null, _osrmLastLng = null;
+const OSRM_DEBOUNCE = 4000;   // ms between API calls
+const OSRM_MIN_MOVE = 15;     // m — don't re-fetch if barely moved
+
+function _clearArrow() {
+  if (arrowLine) { leafletMap.removeLayer(arrowLine); arrowLine = null; }
+  if (arrowHead) { leafletMap.removeLayer(arrowHead); arrowHead = null; }
+}
+
+function _drawArrowHead(pointLatLng, bearingDeg) {
+  const svgArrow = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+    <g transform="rotate(${bearingDeg},14,14)">
+      <polygon points="14,1 20,24 14,19 8,24" fill="#FF6B6B" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
+  </svg>`;
+  const icon = L.divIcon({ html: svgArrow, className: '', iconSize: [28,28], iconAnchor: [14,14] });
+  arrowHead = L.marker(pointLatLng, { icon, interactive: false, zIndexOffset: 600 }).addTo(leafletMap);
+}
+
+function _bearing(lat1, lng1, lat2, lng2) {
+  const R = Math.PI / 180;
+  const dL = (lng2 - lng1) * R;
+  const y = Math.sin(dL) * Math.cos(lat2 * R);
+  const x = Math.cos(lat1 * R) * Math.sin(lat2 * R)
+           - Math.sin(lat1 * R) * Math.cos(lat2 * R) * Math.cos(dL);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
+
+function _drawStraightArrow(lat, lng, target, dist) {
+  const frac = Math.max(0, 1 - 18 / (dist || 1));
+  const tip = [lat + (target.lat - lat) * frac, lng + (target.lng - lng) * frac];
+  arrowLine = L.polyline([[lat, lng], tip], {
+    color: '#FF6B6B', weight: 3, opacity: 0.85, dashArray: '8 6',
+  }).addTo(leafletMap);
+  _drawArrowHead(tip, _bearing(lat, lng, target.lat, target.lng));
+}
+
+async function _fetchOsrmRoute(lat, lng, target) {
+  const url = `https://router.project-osrm.org/route/v1/foot/`
+    + `${lng},${lat};${target.lng},${target.lat}`
+    + `?overview=full&geometries=geojson&steps=false`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6000);
+  try {
+    const res  = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    const json = await res.json();
+    if (json.code !== 'Ok' || !json.routes?.length) return null;
+    // GeoJSON coords er [lng, lat]
+    const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+    return coords;
+  } catch(e) { clearTimeout(t); return null; }
+}
 
 function updateCompass(lat, lng) {
   if (!leafletMap) return;
@@ -1441,7 +1496,6 @@ function updateCompass(lat, lng) {
   const now = Date.now();
   const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
 
-  // أقرب نقطة غير مسجلة وليست في فترة التبريد
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
     const lastTime = cpTimes[cp.order];
@@ -1450,54 +1504,42 @@ function updateCompass(lat, lng) {
     if (d < minDist) { minDist = d; target = cp; }
   });
 
-  // أزل السهم القديم
-  if (arrowLine)  { leafletMap.removeLayer(arrowLine);  arrowLine = null; }
-  if (arrowHead)  { leafletMap.removeLayer(arrowHead);  arrowHead = null; }
-
+  _clearArrow();
   if (!target) return;
 
-  const from = [lat, lng];
-  const to   = [target.lat, target.lng];
+  // Alltid tegn rett linje umiddelbart som fallback
+  _drawStraightArrow(lat, lng, target, minDist);
 
-  // حساب نقطة رأس السهم (80% من المسافة لتجنب تغطية دائرة النقطة)
-  const frac = Math.max(0, 1 - 18 / (minDist || 1));   // يبقى 18 م قبل النقطة
-  const arrowTip = [
-    lat + (target.lat - lat) * frac,
-    lng + (target.lng - lng) * frac,
-  ];
+  // Hent OSRM-rute hvis target endret seg eller bruker har beveget seg nok
+  const targetChanged = _osrmTarget?.order !== target.order;
+  const movedEnough   = _osrmLastLat === null
+    || haversineMeters(lat, lng, _osrmLastLat, _osrmLastLng) > OSRM_MIN_MOVE;
 
-  // الخط المتقطع
-  arrowLine = L.polyline([from, arrowTip], {
-    color: '#FF6B6B',
-    weight: 3,
-    opacity: 0.9,
-    dashArray: '8 6',
-  }).addTo(leafletMap);
+  if (!targetChanged && !movedEnough) return;
 
-  // حساب زاوية رأس السهم
-  const toR = Math.PI / 180;
-  const dLng = (target.lng - lng) * toR;
-  const y = Math.sin(dLng) * Math.cos(target.lat * toR);
-  const x = Math.cos(lat * toR) * Math.sin(target.lat * toR)
-           - Math.sin(lat * toR) * Math.cos(target.lat * toR) * Math.cos(dLng);
-  const angleDeg = ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+  clearTimeout(_osrmTimer);
+  _osrmTimer = setTimeout(async () => {
+    _osrmTarget  = target;
+    _osrmLastLat = lat; _osrmLastLng = lng;
 
-  // SVG رأس السهم
-  const svgArrow = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-    <g transform="rotate(${angleDeg},14,14)">
-      <polygon points="14,1 20,24 14,19 8,24" fill="#FF6B6B" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
-    </g>
-  </svg>`;
+    const coords = await _fetchOsrmRoute(lat, lng, target);
+    if (!coords || coords.length < 2) return;   // beholder rett linje
 
-  const icon = L.divIcon({
-    html: svgArrow,
-    className: '',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
+    // Sjekk at target ikke er byttet mens vi ventet
+    const cpTimesNow = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+    if (cpTimesNow[target.order] && (Date.now() - cpTimesNow[target.order]) < COOLDOWN_MS) return;
 
-  arrowHead = L.marker(arrowTip, { icon, interactive: false, zIndexOffset: 600 })
-    .addTo(leafletMap);
+    _clearArrow();
+    arrowLine = L.polyline(coords, {
+      color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
+    }).addTo(leafletMap);
+
+    // Sett pilen på nest siste punkt → siste punkt for korrekt retning
+    const n = coords.length;
+    const tipPrev = coords[n - 2];
+    const tip     = coords[n - 1];
+    _drawArrowHead(tip, _bearing(tipPrev[0], tipPrev[1], tip[0], tip[1]));
+  }, OSRM_DEBOUNCE);
 }
 
 function initCompass() {}
