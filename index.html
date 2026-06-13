@@ -1819,7 +1819,7 @@ async function onAuthSuccess(user, nameOverride) {
   // Admin-brukere: sjekk om de er admin i admins-tabellen
   let isAdmin = isSuperAdmin;
   if (!isSuperAdmin) {
-    const { data: aRow } = await sbClient.from('admins').select('admin_code').eq('email', user.email).single();
+    const { data: aRow } = await sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).single();
     if (aRow) { isAdmin = true; adminCode = aRow.admin_code; }
   }
 
@@ -2161,7 +2161,7 @@ async function openRapportScreen() {
   if (isSuperAdmin) {
     card.style.display = '';
     // لod قائمة الأدمن
-    const { data } = await sbClient.from('admins').select('email,admin_code').order('created_at');
+    const { data } = await sbClient.from('admins').select('email,admin_code').eq('is_active', true).order('created_at');
     sel.innerHTML = '<option value="">-- Velg admin --</option>';
     (data || []).forEach(a => {
       const opt = document.createElement('option');
@@ -2191,7 +2191,8 @@ async function openSuperAdminScreen() {
 async function renderAdminList() {
   const el = document.getElementById('adminList');
   el.innerHTML = '<div class="list-empty">Laster…</div>';
-  const { data } = await sbClient.from('admins').select('*').order('created_at', { ascending: true });
+  const { data } = await sbClient.from('admins').select('*')
+    .eq('is_active', true).order('created_at', { ascending: true });
   if (!data || data.length === 0) {
     el.innerHTML = '<div class="list-empty">Ingen admins ennå.</div>';
     return;
@@ -2203,12 +2204,12 @@ async function renderAdminList() {
         <div class="cp-admin-name">${a.email}</div>
         <div class="cp-admin-coords">Kode: ${a.admin_code}</div>
       </div>
-      <button class="cp-admin-del" data-id="${a.id}" title="Slett">✕</button>
+      <button class="cp-admin-del" data-id="${a.id}" title="Deaktiver">✕</button>
     </div>`).join('');
   el.querySelectorAll('.cp-admin-del').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Slett denne adminen?')) return;
-      await sbClient.from('admins').delete().eq('id', btn.dataset.id);
+      if (!confirm('Fjerne denne adminen? Sjekkpunktene deres beholdes.')) return;
+      await sbClient.from('admins').update({ is_active: false }).eq('id', btn.dataset.id);
       await renderAdminList();
     });
   });
@@ -2219,15 +2220,31 @@ async function addAdmin() {
   const msg   = document.getElementById('addAdminMsg');
   if (!email) { showMsg(msg, 'Skriv inn e-post', 'amber'); return; }
 
-  // Generer unik kode
-  let code, exists = true;
-  while (exists) {
-    code = genAdminCode();
-    const { data } = await sbClient.from('admins').select('id').eq('admin_code', code);
-    exists = data && data.length > 0;
+  // Sjekk om admin finnes fra før (aktiv eller deaktivert)
+  const { data: existing } = await sbClient.from('admins').select('*').eq('email', email).single();
+
+  if (existing) {
+    if (existing.is_active) {
+      showMsg(msg, 'Denne e-posten er allerede registrert som admin.', 'amber');
+      return;
+    }
+    // Gjenaktiver med samme kode — nqaط og data beholdes
+    await sbClient.from('admins').update({ is_active: true }).eq('id', existing.id);
+    document.getElementById('newAdminEmail').value = '';
+    showMsg(msg, `Admin gjenaktivert! Kode: ${existing.admin_code}`, 'green');
+    await renderAdminList();
+    return;
   }
 
-  const { error } = await sbClient.from('admins').insert({ email, admin_code: code });
+  // Ny admin — generer unik kode
+  let code, taken = true;
+  while (taken) {
+    code = genAdminCode();
+    const { data } = await sbClient.from('admins').select('id').eq('admin_code', code);
+    taken = data && data.length > 0;
+  }
+
+  const { error } = await sbClient.from('admins').insert({ email, admin_code: code, is_active: true });
   if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
 
   document.getElementById('newAdminEmail').value = '';
