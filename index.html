@@ -1506,40 +1506,42 @@ function updateCompass(lat, lng) {
 
   if (!target) { _clearArrow(); _hasRoadRoute = false; _osrmTarget = null; return; }
 
-  const targetChanged = _osrmTarget?.order !== target.order;
+  // Samme mål → bevar det som er tegnet (rett linje eller veirute)
+  if (_osrmTarget?.order === target.order) return;
 
-  if (targetChanged) {
-    // Nytt mål — nullstill og hent ny rute
+  // Nytt mål → planlegg henting av ny rute
+  _osrmTarget = target;
+  clearTimeout(_osrmTimer);
+
+  // Behold gammel rute synlig mens vi venter — ikke slett den ennå
+  _osrmTimer = setTimeout(async () => {
+    if (_osrmTarget?.order !== target.order) return;
+
+    const capturedLat = lat, capturedLng = lng, capturedDist = minDist;
+    const coords = await _fetchOsrmRoute(capturedLat, capturedLng, target);
+
+    if (_osrmTarget?.order !== target.order) return;
+
+    // Sjekk at målet ikke ble registrert mens vi ventet
+    const fresh = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+    if (fresh[target.order] && (Date.now() - fresh[target.order]) < COOLDOWN_MS) return;
+
+    // Nå er vi klare til å tegne — slett gammelt
     _clearArrow();
-    _hasRoadRoute = false;
-    _osrmTarget = target;
-    clearTimeout(_osrmTimer);
 
-    // Tegn rett linje midlertidig mens vi venter på OSRM
-    _drawStraightArrow(lat, lng, target, minDist);
-
-    _osrmTimer = setTimeout(async () => {
-      const coords = await _fetchOsrmRoute(lat, lng, target);
-
-      // Sjekk at målet ikke er registrert mens vi ventet
-      const fresh = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
-      if (fresh[target.order] && (Date.now() - fresh[target.order]) < COOLDOWN_MS) return;
-      if (_osrmTarget?.order !== target.order) return;
-
-      if (coords && coords.length >= 2) {
-        _clearArrow();
-        arrowLine = L.polyline(coords, {
-          color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
-        }).addTo(leafletMap);
-        const n = coords.length;
-        _drawArrowHead(coords[n - 1], _bearing(coords[n-2][0], coords[n-2][1], coords[n-1][0], coords[n-1][1]));
-        _hasRoadRoute = true;
-      }
-      // Hvis OSRM feilet: beholder rett linje som er tegnet
-    }, OSRM_DEBOUNCE);
-
-  }
-  // Samme mål og veirutet er tegnet → ikke gjør noe (bevar ruten)
+    if (coords && coords.length >= 2) {
+      arrowLine = L.polyline(coords, {
+        color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
+      }).addTo(leafletMap);
+      const n = coords.length;
+      _drawArrowHead(coords[n-1], _bearing(coords[n-2][0], coords[n-2][1], coords[n-1][0], coords[n-1][1]));
+      _hasRoadRoute = true;
+    } else {
+      // OSRM fant ingen rute — tegn rett linje som permanent fallback
+      _drawStraightArrow(capturedLat, capturedLng, target, capturedDist);
+      _hasRoadRoute = false;
+    }
+  }, OSRM_DEBOUNCE);
 }
 
 function initCompass() {}
