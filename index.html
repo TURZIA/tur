@@ -807,7 +807,7 @@
       </div>
       <div>
         <div class="input-label">Koordinater (desimal eller grader)</div>
-        <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732  eller  Google Maps-lenke' autocorrect="off" autocapitalize="off" />
+        <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
       </div>
       <button class="btn btn-green" id="cpAddBtn">+ Legg til</button>
       <div id="cpAddMsg" class="form-msg" style="display:none;"></div>
@@ -2282,49 +2282,6 @@ function parseCoordsFromText(str) {
 
 function parseDMS(str) { return parseCoordsFromText(str); }
 
-async function resolveShortGmapsUrl(url) {
-  const proxies = [
-    'https://api.allorigins.win/raw?url=',
-    'https://corsproxy.io/?',
-    'https://api.codetabs.com/v1/proxy?quest=',
-  ];
-
-  function extractCoords(text) {
-    // @lat,lng i URL eller HTML
-    const p1 = text.match(/@(-?\d{1,3}\.\d{4,}),(-?\d{1,3}\.\d{4,})/);
-    if (p1) return { lat: parseFloat(p1[1]), lng: parseFloat(p1[2]) };
-    // "lat":59.xxx,"lng":10.xxx i JSON-data
-    const p2 = text.match(/"lat"\s*:\s*(-?\d+\.\d+)[^}]*"lng"\s*:\s*(-?\d+\.\d+)/);
-    if (p2) return { lat: parseFloat(p2[1]), lng: parseFloat(p2[2]) };
-    // ll=lat,lng i URL
-    const p3 = text.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (p3) return { lat: parseFloat(p3[1]), lng: parseFloat(p3[2]) };
-    // Koordinater i meta-innhold
-    const p4 = text.match(/content="(-?\d{1,3}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})"/);
-    if (p4) return { lat: parseFloat(p4[1]), lng: parseFloat(p4[2]) };
-    // Tall-sekvenser som ligner koordinater: [lat,lng] i JSON-array
-    const p5 = text.match(/\[(-?\d{1,3}\.\d{5,}),(-?\d{1,3}\.\d{5,})\]/);
-    if (p5) return { lat: parseFloat(p5[1]), lng: parseFloat(p5[2]) };
-    return null;
-  }
-
-  for (const proxy of proxies) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const res  = await fetch(proxy + encodeURIComponent(url), { signal: controller.signal });
-      clearTimeout(timer);
-      const text = await res.text();
-      console.log('Proxy svar (200 tegn):', text.slice(0, 200));
-      const pos = extractCoords(text);
-      if (pos) return pos;
-      // Sjekk canonical-lenke
-      const canon = text.match(/canonical[^>]+href="([^"]+)"/i);
-      if (canon) { const p = extractCoords(decodeURIComponent(canon[1])); if (p) return p; }
-    } catch(e) { console.warn('Proxy feil:', proxy, e.message); }
-  }
-  return null;
-}
 
 async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
@@ -2389,16 +2346,8 @@ async function addCheckpoint() {
   if (!name)   { showMsg(msg, 'Skriv inn et navn', 'amber'); return; }
   if (!coords) { showMsg(msg, 'Skriv inn koordinater eller lim inn en Google Maps-lenke', 'amber'); return; }
 
-  btn.disabled = true; btn.textContent = 'Henter koordinater…';
-  let pos = parseCoordsFromText(coords);
-
-  if (!pos && (coords.includes('goo.gl') || coords.includes('maps.app'))) {
-    showMsg(msg, 'Løser opp kort lenke…', 'amber');
-    pos = await resolveShortGmapsUrl(coords);
-  }
-
-  btn.disabled = false; btn.textContent = '+ Legg til';
-  if (!pos) { showMsg(msg, 'Kunne ikke hente koordinater. Prøv å lime inn hele Google Maps-lenken eller skriv koordinater direkte.', 'red'); return; }
+  const pos = parseCoordsFromText(coords);
+  if (!pos) { showMsg(msg, 'Ugyldig koordinater — bruk f.eks. 59.9510 10.7732', 'red'); return; }
 
   const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
   const { data: existing } = await sbClient.from('checkpoints')
