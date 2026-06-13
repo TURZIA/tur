@@ -576,6 +576,38 @@
       min-height: 48px;
     }
     #androidInstallBtn.visible { display: block; }
+
+    /* ===== SHARED FORM ELEMENTS ===== */
+    .btn-blue {
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+    }
+    .form-select {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 1rem; font-family: inherit; background: var(--bg); color: var(--text);
+      outline: none; -webkit-appearance: none; cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-select:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(14,163,113,0.12);
+    }
+    .form-msg {
+      font-size: 0.85rem; padding: 10px 14px;
+      border-radius: var(--radius-sm); text-align: center; font-weight: 500;
+    }
+    /* Lists inside rapport-body */
+    #adminList, #cpAdminList {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .list-empty {
+      color: var(--muted); font-size: 0.88rem;
+      padding: 16px; text-align: center;
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -725,10 +757,10 @@
     <div id="map"></div>
 
 <div class="map-legend">
-      <div class="legend-row"><div class="legend-dot" style="background:#1D9E75;border:2px solid #fff;box-shadow:0 0 0 1px #1D9E75"></div> Sjekkpunkt</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#E24B4A;border:2px solid #fff;box-shadow:0 0 0 1px #E24B4A"></div> Registrert</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#0EA371;border:2px solid #fff;box-shadow:0 0 0 1px #0EA371"></div> Sjekkpunkt</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#EF4444;border:2px solid #fff;box-shadow:0 0 0 1px #EF4444"></div> Registrert</div>
       <div class="legend-row"><div class="legend-dot" style="background:#3B82F6;border:2px solid #fff;box-shadow:0 0 0 1px #3B82F6"></div> Din posisjon</div>
-      <div class="legend-row"><div style="width:20px;height:3px;background:#1D9E75;border-radius:2px"></div> Rute</div>
+      <div class="legend-row"><div style="width:20px;height:3px;background:#0EA371;border-radius:2px"></div> Rute</div>
     </div>
   </div>
 
@@ -744,15 +776,15 @@
     <span class="rapport-title">Administrer admins</span>
   </div>
   <div class="rapport-body">
-    <div id="adminList" style="display:flex;flex-direction:column;gap:10px;"></div>
-    <div class="rapport-card" style="margin-top:8px;">
+    <div id="adminList"></div>
+    <div class="rapport-card">
       <div class="rapport-card-title">Legg til ny admin</div>
       <div>
         <div class="input-label">E-post til admin</div>
         <input type="email" id="newAdminEmail" placeholder="admin@example.com" autocorrect="off" autocapitalize="none" />
       </div>
       <button class="btn btn-green" id="addAdminBtn">Legg til admin</button>
-      <div id="addAdminMsg" style="display:none;font-size:0.85rem;padding:8px;border-radius:8px;text-align:center;"></div>
+      <div id="addAdminMsg" class="form-msg" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -764,10 +796,10 @@
     <span class="rapport-title">Rediger sjekkpunkter</span>
   </div>
   <div class="rapport-body">
-    <div id="cpAdminList" style="display:flex;flex-direction:column;gap:10px;"></div>
+    <div id="cpAdminList"></div>
 
     <!-- Legg til skjema -->
-    <div class="rapport-card" id="cpAddForm" style="margin-top:8px;">
+    <div class="rapport-card" id="cpAddForm">
       <div class="rapport-card-title">Legg til sjekkpunkt</div>
       <div>
         <div class="input-label">Navn</div>
@@ -778,7 +810,7 @@
         <input type="text" id="cpNewCoords" placeholder='59.9510 10.7732  eller  59°57\'03.5"N 10°46\'23.7"E' autocorrect="off" autocapitalize="off" />
       </div>
       <button class="btn btn-green" id="cpAddBtn">+ Legg til</button>
-      <div id="cpAddMsg" style="display:none;font-size:0.85rem;padding:8px;border-radius:8px;text-align:center;"></div>
+      <div id="cpAddMsg" class="form-msg" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -794,7 +826,7 @@
     <!-- Velg admin (kun synlig for super admin) -->
     <div class="rapport-card" id="adminSelectCard" style="display:none;">
       <div class="rapport-card-title">Velg admin</div>
-      <select id="adminSelect" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;">
+      <select id="adminSelect" class="form-select">
         <option value="">-- Velg admin --</option>
       </select>
     </div>
@@ -816,10 +848,7 @@
     <div id="leaderboard" style="display:none;margin-top:12px;"></div>
 
     <button class="btn btn-green" id="genRapportBtn">Last ned Excel-rapport</button>
-    <button class="btn" id="sendRapportBtn"
-      style="background:#3B82F6;color:#fff;margin-top:-8px;">
-      Send til e-post
-    </button>
+    <button class="btn btn-blue" id="sendRapportBtn">Send til e-post</button>
 
   </div>
 </div>
@@ -1688,10 +1717,16 @@ async function handleSendReset() {
 function showMsg(el, text, color) {
   el.textContent = text;
   el.style.display = '';
-  el.style.background = color === 'green' ? '#d1fae5'
-    : color === 'red' ? '#fee2e2' : '#fef3c7';
-  el.style.color = color === 'green' ? '#065f46'
-    : color === 'red' ? '#991b1b' : '#92400e';
+  if (color === 'green') {
+    el.style.background = 'var(--green-lt)'; el.style.color = 'var(--green-dk)';
+    el.style.border = '1px solid rgba(14,163,113,0.2)';
+  } else if (color === 'red') {
+    el.style.background = '#FEF2F2'; el.style.color = '#B91C1C';
+    el.style.border = '1px solid rgba(239,68,68,0.2)';
+  } else {
+    el.style.background = '#FFFBEB'; el.style.color = '#92400E';
+    el.style.border = '1px solid rgba(245,158,11,0.2)';
+  }
 }
 
 async function handleUpdatePassword() {
@@ -2155,10 +2190,10 @@ async function openSuperAdminScreen() {
 
 async function renderAdminList() {
   const el = document.getElementById('adminList');
-  el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Laster…</div>';
+  el.innerHTML = '<div class="list-empty">Laster…</div>';
   const { data } = await sbClient.from('admins').select('*').order('created_at', { ascending: true });
   if (!data || data.length === 0) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Ingen admins ennå.</div>';
+    el.innerHTML = '<div class="list-empty">Ingen admins ennå.</div>';
     return;
   }
   el.innerHTML = data.map(a => `
@@ -2243,14 +2278,14 @@ async function openCpAdminScreen() {
 
 async function renderCpAdminList() {
   const el = document.getElementById('cpAdminList');
-  el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Laster…</div>';
+  el.innerHTML = '<div class="list-empty">Laster…</div>';
   try {
     const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
     const { data } = await sbClient.from('checkpoints')
       .select('*').eq('race_id', raceId)
       .order('cp_order', { ascending: true });
     if (!data || data.length === 0) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;padding:8px;">Ingen sjekkpunkter lagt til ennå.</div>';
+      el.innerHTML = '<div class="list-empty">Ingen sjekkpunkter lagt til ennå.</div>';
       return;
     }
     el.innerHTML = data.map(cp => `
