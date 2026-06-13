@@ -939,7 +939,9 @@ let positionMarker    = null;   // نقطة زرقاء
 let liveTrackLine     = null;   // خط المسار الحي
 let trackPoints       = [];     // نقاط المسار [[lat,lng],...]
 let cpMarkers         = {};     // { order: L.circleMarker }
-let raceRouteLine     = null;   // خط المسار الكامل بين النقاط (أصفر-برتقالي)
+let raceRouteLine     = null;   // unused — kept for compat
+let raceRouteSegments = [];     // L.polyline per segment
+const LS_RACE_ROUTE   = 'raceRoute_v2';
 let activePulseMarker = null;
 let activePulseOrder  = null;
 let lastTrackedPos    = null;   // آخر موقع أُضيف للمسار
@@ -1064,6 +1066,7 @@ function setCpTime(order) {
   const times = getCpTimes();
   times[order] = Date.now();
   localStorage.setItem(LS_CP_TIMES, JSON.stringify(times));
+  updateRaceRouteColors();
 }
 function cpOnCooldown(order) {
   const t = getCpTimes()[order];
@@ -2399,41 +2402,85 @@ async function addCheckpoint() {
   drawRaceRoute();
 }
 
+function _clearRaceRoute() {
+  raceRouteSegments.forEach(p => leafletMap && leafletMap.removeLayer(p));
+  raceRouteSegments = [];
+}
+
+function _drawSegments(cps, segments) {
+  _clearRaceRoute();
+  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  segments.forEach((points, i) => {
+    if (!points || points.length < 2) return;
+    const done = !!cpTimes[cps[i]?.order];
+    const line = L.polyline(points, {
+      color:     done ? '#0EA371' : '#F59E0B',
+      weight:    4,
+      opacity:   0.78,
+      dashArray: done ? null : '10 6',
+    }).addTo(leafletMap);
+    line.bringToBack();
+    raceRouteSegments.push(line);
+  });
+}
+
+function updateRaceRouteColors() {
+  if (!leafletMap || !raceRouteSegments.length) return;
+  const cps     = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
+  const cpTimes = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+  raceRouteSegments.forEach((line, i) => {
+    const done = !!cpTimes[cps[i]?.order];
+    line.setStyle({ color: done ? '#0EA371' : '#F59E0B', dashArray: done ? null : '10 6' });
+  });
+}
+
 async function drawRaceRoute() {
   if (!leafletMap) return;
-  if (raceRouteLine) { leafletMap.removeLayer(raceRouteLine); raceRouteLine = null; }
-
   const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
-  if (cps.length < 2) return;
+  if (cps.length < 2) { _clearRaceRoute(); return; }
 
-  // Bygg OSRM waypoint-URL for alle sjekkpunkter i rekkefølge
-  const coords = cps.map(cp => `${cp.lng},${cp.lat}`).join(';');
-  const url = `https://router.project-osrm.org/route/v1/foot/${coords}`
-    + `?overview=full&geometries=geojson&steps=false`;
+  // Cache key = fingerprint av sjekkpunkt-koordinater
+  const cacheKey = cps.map(cp => `${cp.lat},${cp.lng}`).join('|');
+
+  // Sjekk localStorage-cache
+  try {
+    const cached = JSON.parse(localStorage.getItem(LS_RACE_ROUTE) || 'null');
+    if (cached?.key === cacheKey && cached.segments?.length === cps.length - 1) {
+      _drawSegments(cps, cached.segments);
+      return;
+    }
+  } catch(e) {}
+
+  // Hent fra OSRM — overview=false + steps=true gir geometri per etappe
+  const waypointStr = cps.map(cp => `${cp.lng},${cp.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/foot/${waypointStr}`
+    + `?overview=false&geometries=geojson&steps=true`;
 
   try {
     const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), 10000);
+    const t    = setTimeout(() => ctrl.abort(), 12000);
     const res  = await fetch(url, { signal: ctrl.signal });
     clearTimeout(t);
     const json = await res.json();
 
-    if (json.code === 'Ok' && json.routes?.length) {
-      const latLngs = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-      raceRouteLine = L.polyline(latLngs, {
-        color: '#F59E0B', weight: 4, opacity: 0.7, dashArray: '12 6',
-      }).addTo(leafletMap);
-      raceRouteLine.bringToBack();
-      return;
-    }
-  } catch(e) { /* fallback */ }
+    if (json.code !== 'Ok' || !json.routes?.[0]?.legs) return; // ikke tegn noe ved feil
 
-  // Fallback: rette linjer mellom sjekkpunktene
-  const latLngs = cps.map(cp => [cp.lat, cp.lng]);
-  raceRouteLine = L.polyline(latLngs, {
-    color: '#F59E0B', weight: 3, opacity: 0.6, dashArray: '10 6',
-  }).addTo(leafletMap);
-  raceRouteLine.bringToBack();
+    const segments = json.routes[0].legs.map(leg => {
+      const pts = [];
+      (leg.steps || []).forEach(step => {
+        (step.geometry?.coordinates || []).forEach(c => pts.push([c[1], c[0]]));
+      });
+      return pts;
+    });
+
+    // Lagre i cache
+    try { localStorage.setItem(LS_RACE_ROUTE, JSON.stringify({ key: cacheKey, segments })); } catch(e) {}
+
+    _drawSegments(cps, segments);
+  } catch(e) {
+    console.warn('OSRM race route feil:', e.message);
+    // Ikke tegn fallback — tegn ingenting hvis OSRM feiler
+  }
 }
 
 function rebuildMapMarkers() {
