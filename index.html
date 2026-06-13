@@ -552,18 +552,17 @@
       position: absolute;
       top: 12px; right: 12px;
       width: 52px; height: 52px;
-      background: rgba(255,255,255,0.92);
+      background: rgba(255,255,255,0.95);
       border-radius: 50%;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+      box-shadow: 0 2px 14px rgba(0,0,0,0.22);
       display: flex; align-items: center; justify-content: center;
       z-index: 410;
       cursor: pointer;
-      border: 2px solid rgba(255,255,255,0.9);
+      border: 2px solid rgba(255,255,255,1);
       backdrop-filter: blur(6px);
-      transition: opacity 0.3s;
     }
-    #compassWidget.hidden { opacity: 0; pointer-events: none; }
-    #compassArrow { transition: transform 0.3s ease-out; display: block; }
+    #compassWidget.inactive { opacity: 0.55; }
+    #compassArrow { transition: transform 0.25s ease-out; display: block; }
 
     /* ===== IOS BANNER ===== */
     #iosBanner {
@@ -1567,8 +1566,9 @@ function _updateCompassArrow() {
   const arrow  = document.getElementById('compassArrow');
   if (!widget || !arrow) return;
 
+  // Ingen GPS eller ingen heading → vis inaktiv
   if (_compassHeading === null || _compassUserLat === null) {
-    widget.classList.add('hidden'); return;
+    widget.classList.add('inactive'); return;
   }
 
   const now = Date.now();
@@ -1581,13 +1581,12 @@ function _updateCompassArrow() {
     if (d < minDist) { minDist = d; target = cp; }
   });
 
-  if (!target) { widget.classList.add('hidden'); return; }
+  if (!target) { widget.classList.add('inactive'); return; }
 
+  widget.classList.remove('inactive');
   const bearing = _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
-  // Roter pilen: bearing relativt til enhetsretning
   const rotate  = (bearing - _compassHeading + 360) % 360;
   arrow.style.transform = `rotate(${rotate}deg)`;
-  widget.classList.remove('hidden');
 }
 
 function _onDeviceOrientation(e) {
