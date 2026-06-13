@@ -520,6 +520,10 @@
       border-color: var(--green);
       box-shadow: 0 0 0 3px rgba(14,163,113,0.12);
     }
+    .date-fields-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    .date-field-wrap { display: flex; flex-direction: column; gap: 6px; }
     input[type="date"] {
       width: 100%; padding: 11px 14px;
       border: 1.5px solid var(--border); border-radius: var(--radius-sm);
@@ -796,13 +800,16 @@
     </div>
 
     <div class="rapport-card">
-      <div class="rapport-card-title">Fra dato</div>
-      <input type="date" id="fraDate" />
-    </div>
-
-    <div class="rapport-card">
-      <div class="rapport-card-title">Til dato</div>
-      <input type="date" id="tilDate" />
+      <div class="date-fields-row">
+        <div class="date-field-wrap">
+          <div class="rapport-card-title">Fra dato</div>
+          <input type="date" id="fraDate" />
+        </div>
+        <div class="date-field-wrap">
+          <div class="rapport-card-title">Til dato</div>
+          <input type="date" id="tilDate" />
+        </div>
+      </div>
     </div>
 
     <div id="rapportResult"></div>
