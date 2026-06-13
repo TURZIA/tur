@@ -919,28 +919,7 @@ const CONFIG = {
   MAX_DISTANCE_METERS: 20,
 
   // 20 نقطة على شارع كارل يوهان في أوسلو — للاختبار
-  CHECKPOINTS: [
-    { order: 1,  name: 'NP-1 — Oslo S (start)',       lat: 59.91110, lng: 10.75280 },
-    { order: 2,  name: 'NP-2 — Jernbanetorget',       lat: 59.91141, lng: 10.75145 },
-    { order: 3,  name: 'NP-3 — Biskop Gunnerus gt',   lat: 59.91171, lng: 10.75010 },
-    { order: 4,  name: 'NP-4 — Kirkeristen',          lat: 59.91202, lng: 10.74876 },
-    { order: 5,  name: 'NP-5 — Akersgata',            lat: 59.91232, lng: 10.74741 },
-    { order: 6,  name: 'NP-6 — Kongens gate',         lat: 59.91263, lng: 10.74606 },
-    { order: 7,  name: 'NP-7 — Lille Grensen',        lat: 59.91293, lng: 10.74472 },
-    { order: 8,  name: 'NP-8 — Grensen',              lat: 59.91324, lng: 10.74337 },
-    { order: 9,  name: 'NP-9 — Rosenkrantz gt',       lat: 59.91354, lng: 10.74202 },
-    { order: 10, name: 'NP-10 — Stortinget',          lat: 59.91385, lng: 10.74068 },
-    { order: 11, name: 'NP-11 — Universitetsplassen', lat: 59.91415, lng: 10.73933 },
-    { order: 12, name: 'NP-12 — Universitetsgata',    lat: 59.91446, lng: 10.73798 },
-    { order: 13, name: 'NP-13 — Nationaltheatret',    lat: 59.91476, lng: 10.73664 },
-    { order: 14, name: 'NP-14 — Ruseløkkveien',       lat: 59.91507, lng: 10.73529 },
-    { order: 15, name: 'NP-15 — Arbinsgate',          lat: 59.91537, lng: 10.73394 },
-    { order: 16, name: 'NP-16 — Parkveien',           lat: 59.91568, lng: 10.73260 },
-    { order: 17, name: 'NP-17 — Wergelandsveien',     lat: 59.91598, lng: 10.73125 },
-    { order: 18, name: 'NP-18 — Observatoriegata',    lat: 59.91629, lng: 10.72990 },
-    { order: 19, name: 'NP-19 — Slottsparken',        lat: 59.91659, lng: 10.72856 },
-    { order: 20, name: 'NP-20 — Slottet (mål)',       lat: 59.91690, lng: 10.72721 },
-  ],
+  CHECKPOINTS: [],
 };
 
 /* ============================================================
@@ -2329,16 +2308,17 @@ function parseDMS(str) { return parseCoordsFromText(str); }
 
 async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
-  const raceId = adminCode || CONFIG.RACE_ID;
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   try {
-    const { data, error } = await sbClient
-      .from('checkpoints')
-      .select('*')
-      .eq('race_id', raceId)
-      .order('cp_order', { ascending: true });
-    if (error || !data || data.length === 0) return;
+    let query = sbClient.from('checkpoints').select('*').order('cp_order', { ascending: true });
+    if (!isSuperAdmin) {
+      const raceId = adminCode || CONFIG.RACE_ID;
+      query = query.eq('race_id', raceId);
+    }
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) { CONFIG.CHECKPOINTS = []; return; }
     CONFIG.CHECKPOINTS = data.map(r => ({
-      order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng,
+      order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
     }));
   } catch(e) { console.warn('Checkpoint load:', e); }
 }
