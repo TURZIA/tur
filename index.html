@@ -821,6 +821,14 @@
     <span class="rapport-title">Rediger sjekkpunkter</span>
   </div>
   <div class="rapport-body">
+    <!-- اختيار السباق للسوبر أدمن فقط -->
+    <div class="rapport-card" id="cpRaceSelectCard" style="display:none;">
+      <div class="rapport-card-title">Velg sjekkpunkt-løp</div>
+      <select id="cpRaceSelect" class="form-select">
+        <option value="">-- Velg løp --</option>
+      </select>
+    </div>
+
     <div id="cpAdminList"></div>
 
     <!-- Legg til skjema -->
@@ -2017,6 +2025,7 @@ async function onAuthSuccess(user, nameOverride) {
 async function handleSignout() {
   if (!confirm('Vil du logge ut?')) return;
   if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   // مسح بيانات الجلسة قبل تغيير currentUser حتى نحصل على المفتاح الصح
   localStorage.removeItem(_cpTimesKey());
   localStorage.removeItem(LS_TRACK);
@@ -2054,50 +2063,52 @@ function startRealtime(runner) {
   if (!sbClient) return;
   if (realtimeChannel) sbClient.removeChannel(realtimeChannel);
 
+  const isSuperAdmin = runner.email === CONFIG.ADMIN_EMAIL;
   const raceId = runner.adminCode || CONFIG.RACE_ID;
 
-  realtimeChannel = sbClient
-    .channel('live-updates')
+  const ch = sbClient.channel('live-updates');
 
-    // Ny innsjekking fra hvem som helst → oppdater kartet
-    .on('postgres_changes', {
+  // check_ins: السوبر أدمن لا يشارك كراكض — لا نتابع سجلاته
+  if (!isSuperAdmin) {
+    ch.on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'check_ins',
       filter: `race_id=eq.${raceId}`,
     }, payload => {
       const row = payload.new;
-      // Marker nåværende brukers sjekkpunkt som fullført
       if (row.runner_id === runner.id && row.checkpoint_order) {
         markCheckpointDone(row.checkpoint_order, row.race_id);
       }
-      // Oppdater historikk-skuff hvis åpen
       if (document.getElementById('historyDrawer').classList.contains('open') &&
           row.runner_id === runner.id) {
         loadHistoryDrawer(runner.id);
       }
-    })
+    });
+  }
 
-    // Nytt sjekkpunkt lagt til av admin → oppdater kart
-    .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'checkpoints',
-      filter: `race_id=eq.${raceId}`,
-    }, async () => {
-      await loadCheckpointsFromSupabase(raceId);
-      rebuildMapMarkers();
-      if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
-      drawRaceRoute();
-    })
+  // checkpoints INSERT/DELETE
+  // السوبر أدمن: بدون فلتر race_id (يستقبل من كل السباقات)
+  // الأدمن العادي: فلتر بـ raceId
+  const cpInsertOpts = isSuperAdmin
+    ? { event: 'INSERT', schema: 'public', table: 'checkpoints' }
+    : { event: 'INSERT', schema: 'public', table: 'checkpoints', filter: `race_id=eq.${raceId}` };
 
-    // Sjekkpunkt slettet → oppdater kart
-    .on('postgres_changes', {
-      event: 'DELETE', schema: 'public', table: 'checkpoints',
-    }, async () => {
-      await loadCheckpointsFromSupabase(raceId);
-      rebuildMapMarkers();
-      if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
-      drawRaceRoute();
-    })
+  ch.on('postgres_changes', cpInsertOpts, async () => {
+    await loadCheckpointsFromSupabase(isSuperAdmin ? null : raceId);
+    rebuildMapMarkers();
+    if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
+    drawRaceRoute();
+  });
 
-    .subscribe();
+  ch.on('postgres_changes', {
+    event: 'DELETE', schema: 'public', table: 'checkpoints',
+  }, async () => {
+    await loadCheckpointsFromSupabase(isSuperAdmin ? null : raceId);
+    rebuildMapMarkers();
+    if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
+    drawRaceRoute();
+  });
+
+  realtimeChannel = ch.subscribe();
 }
 
 /* ============================================================
@@ -2348,13 +2359,13 @@ async function openRapportScreen() {
 
   if (isSuperAdmin) {
     card.style.display = '';
-    // لod قائمة الأدمن
-    const { data } = await sbClient.from('admins').select('email,admin_code').eq('is_active', true).order('created_at');
+    // تحميل كل الأدمنز بما فيهم المحذوفون لرؤية التقارير التاريخية
+    const { data } = await sbClient.from('admins').select('email,admin_code,is_active').order('created_at');
     sel.innerHTML = '<option value="">-- Velg admin --</option>';
     (data || []).forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.admin_code;
-      opt.textContent = `${a.email} (${a.admin_code})`;
+      opt.textContent = `${a.email} (${a.admin_code})${a.is_active ? '' : ' — deaktivert'}`;
       sel.appendChild(opt);
     });
   } else {
@@ -2368,7 +2379,10 @@ async function openRapportScreen() {
    SUPER ADMIN — manage admins
    ============================================================ */
 function genAdminCode() {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
 }
 
 async function openSuperAdminScreen() {
@@ -2407,6 +2421,7 @@ async function addAdmin() {
   const email = (document.getElementById('newAdminEmail').value || '').trim().toLowerCase();
   const msg   = document.getElementById('addAdminMsg');
   if (!email) { showMsg(msg, 'Skriv inn e-post', 'amber'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg(msg, 'Ugyldig e-postadresse', 'red'); return; }
 
   // Sjekk om admin finnes fra før (aktiv eller deaktivert)
   const { data: existing } = await sbClient.from('admins').select('*').eq('email', email).single();
@@ -2488,8 +2503,32 @@ async function loadCheckpointsFromSupabase(adminCode) {
   } catch(e) { console.warn('Checkpoint load:', e); }
 }
 
+function _cpAdminRaceId() {
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  if (isSuperAdmin) return document.getElementById('cpRaceSelect')?.value || null;
+  return currentUser?.adminCode || CONFIG.RACE_ID;
+}
+
 async function openCpAdminScreen() {
   showScreen('cpAdminScreen');
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  const card = document.getElementById('cpRaceSelectCard');
+  const sel  = document.getElementById('cpRaceSelect');
+
+  if (isSuperAdmin) {
+    card.style.display = '';
+    const { data } = await sbClient.from('admins').select('email,admin_code').eq('is_active', true).order('created_at');
+    sel.innerHTML = '<option value="">-- Velg løp --</option>';
+    (data || []).forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.admin_code;
+      opt.textContent = `${a.email} (${a.admin_code})`;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => renderCpAdminList();
+  } else {
+    card.style.display = 'none';
+  }
   await renderCpAdminList();
 }
 
@@ -2497,7 +2536,8 @@ async function renderCpAdminList() {
   const el = document.getElementById('cpAdminList');
   el.innerHTML = '<div class="list-empty">Laster…</div>';
   try {
-    const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
+    const raceId = _cpAdminRaceId();
+    if (!raceId) { el.innerHTML = '<div class="list-empty">Velg et løp ovenfor.</div>'; return; }
     const { data } = await sbClient.from('checkpoints')
       .select('*').eq('race_id', raceId)
       .order('cp_order', { ascending: true });
@@ -2540,7 +2580,8 @@ async function addCheckpoint() {
   const pos = parseCoordsFromText(coords);
   if (!pos) { showMsg(msg, 'Ugyldig koordinater — bruk f.eks. 59.9510 10.7732', 'red'); return; }
 
-  const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
+  const raceId = _cpAdminRaceId();
+  if (!raceId) { showMsg(msg, 'Velg et løp først', 'amber'); return; }
   const { data: existing } = await sbClient.from('checkpoints')
     .select('cp_order').eq('race_id', raceId)
     .order('cp_order', { ascending: false }).limit(1);
