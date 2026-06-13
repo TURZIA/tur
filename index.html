@@ -1320,7 +1320,14 @@ function updateRegisterButton(lat, lng) {
   const btn = document.getElementById('registerBtn');
   if (btn.disabled) return;
 
-  if (!CONFIG.VERIFY_LOCATION || CONFIG.CHECKPOINTS.length === 0) {
+  if (CONFIG.CHECKPOINTS.length === 0) {
+    stopPulse();
+    btn.className = 'btn btn-gray';
+    btn.textContent = 'Ingen sjekkpunkter tilgjengelig';
+    return;
+  }
+
+  if (!CONFIG.VERIFY_LOCATION) {
     stopPulse();
     btn.className = 'btn btn-green';
     btn.textContent = 'Registrer posisjon';
