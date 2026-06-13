@@ -1435,10 +1435,10 @@ function findNearestCheckpoint(lat, lng) {
 let arrowLine = null;   // L.polyline or L.layerGroup (route)
 let arrowHead = null;   // L.marker رأس السهم
 
-// OSRM debounce
-let _osrmTarget = null, _osrmTimer = null, _osrmLastLat = null, _osrmLastLng = null;
-const OSRM_DEBOUNCE = 4000;   // ms between API calls
-const OSRM_MIN_MOVE = 15;     // m — don't re-fetch if barely moved
+// OSRM state
+let _osrmTarget = null, _osrmTimer = null;
+let _hasRoadRoute = false;   // true = road route er tegnet, ikke tegn rett linje
+const OSRM_DEBOUNCE = 3000;
 
 function _clearArrow() {
   if (arrowLine) { leafletMap.removeLayer(arrowLine); arrowLine = null; }
@@ -1504,42 +1504,42 @@ function updateCompass(lat, lng) {
     if (d < minDist) { minDist = d; target = cp; }
   });
 
-  _clearArrow();
-  if (!target) return;
+  if (!target) { _clearArrow(); _hasRoadRoute = false; _osrmTarget = null; return; }
 
-  // Alltid tegn rett linje umiddelbart som fallback
-  _drawStraightArrow(lat, lng, target, minDist);
-
-  // Hent OSRM-rute hvis target endret seg eller bruker har beveget seg nok
   const targetChanged = _osrmTarget?.order !== target.order;
-  const movedEnough   = _osrmLastLat === null
-    || haversineMeters(lat, lng, _osrmLastLat, _osrmLastLng) > OSRM_MIN_MOVE;
 
-  if (!targetChanged && !movedEnough) return;
-
-  clearTimeout(_osrmTimer);
-  _osrmTimer = setTimeout(async () => {
-    _osrmTarget  = target;
-    _osrmLastLat = lat; _osrmLastLng = lng;
-
-    const coords = await _fetchOsrmRoute(lat, lng, target);
-    if (!coords || coords.length < 2) return;   // beholder rett linje
-
-    // Sjekk at target ikke er byttet mens vi ventet
-    const cpTimesNow = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
-    if (cpTimesNow[target.order] && (Date.now() - cpTimesNow[target.order]) < COOLDOWN_MS) return;
-
+  if (targetChanged) {
+    // Nytt mål — nullstill og hent ny rute
     _clearArrow();
-    arrowLine = L.polyline(coords, {
-      color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
-    }).addTo(leafletMap);
+    _hasRoadRoute = false;
+    _osrmTarget = target;
+    clearTimeout(_osrmTimer);
 
-    // Sett pilen på nest siste punkt → siste punkt for korrekt retning
-    const n = coords.length;
-    const tipPrev = coords[n - 2];
-    const tip     = coords[n - 1];
-    _drawArrowHead(tip, _bearing(tipPrev[0], tipPrev[1], tip[0], tip[1]));
-  }, OSRM_DEBOUNCE);
+    // Tegn rett linje midlertidig mens vi venter på OSRM
+    _drawStraightArrow(lat, lng, target, minDist);
+
+    _osrmTimer = setTimeout(async () => {
+      const coords = await _fetchOsrmRoute(lat, lng, target);
+
+      // Sjekk at målet ikke er registrert mens vi ventet
+      const fresh = JSON.parse(localStorage.getItem(LS_CP_TIMES) || '{}');
+      if (fresh[target.order] && (Date.now() - fresh[target.order]) < COOLDOWN_MS) return;
+      if (_osrmTarget?.order !== target.order) return;
+
+      if (coords && coords.length >= 2) {
+        _clearArrow();
+        arrowLine = L.polyline(coords, {
+          color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
+        }).addTo(leafletMap);
+        const n = coords.length;
+        _drawArrowHead(coords[n - 1], _bearing(coords[n-2][0], coords[n-2][1], coords[n-1][0], coords[n-1][1]));
+        _hasRoadRoute = true;
+      }
+      // Hvis OSRM feilet: beholder rett linje som er tegnet
+    }, OSRM_DEBOUNCE);
+
+  }
+  // Samme mål og veirutet er tegnet → ikke gjør noe (bevar ruten)
 }
 
 function initCompass() {}
