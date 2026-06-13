@@ -2613,6 +2613,18 @@ async function _loadCpRaceDropdown() {
       if (badge) badge.style.display = 'none';
     }
     renderCpAdminList();
+    // Update map with selected race's checkpoints
+    if (raceId) {
+      const { data } = await sbClient.from('checkpoints')
+        .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
+      CONFIG.CHECKPOINTS = (data || []).map(r => ({
+        id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
+      }));
+    } else {
+      CONFIG.CHECKPOINTS = [];
+    }
+    rebuildMapMarkers();
+    drawRaceRoute();
   };
 
   sel.onchange = _updateRaceInfo;
