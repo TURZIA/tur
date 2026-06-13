@@ -969,6 +969,7 @@ let raceRouteSegments = [];     // L.polyline per segment
 const LS_RACE_ROUTE   = 'raceRoute_v2';
 let activePulseMarker = null;
 let activePulseOrder  = null;
+let activePulseCp     = null;
 let lastTrackedPos    = null;   // آخر موقع أُضيف للمسار
 let bestRecentPos     = null;   // أدق موقع من آخر 10 ثوانٍ (للتسجيل)
 let smoothedPos       = null;   // موقع مُمهَّد بـ EMA
@@ -1067,9 +1068,8 @@ async function fetchRunnerHistory(runnerId) {
   try {
     const { data, error } = await sbClient
       .from('check_ins')
-      .select('checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, timestamp, elapsed_seconds')
+      .select('checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, timestamp, elapsed_seconds, race_id')
       .eq('runner_id', runnerId)
-      .eq('race_id', CONFIG.RACE_ID)
       .order('timestamp', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -1209,26 +1209,34 @@ function drawCheckpointMarkers() {
       fillColor: '#0EA371', fillOpacity: 1,
     }).addTo(leafletMap);
     marker.bindTooltip(`${cp.order}. ${cp.name}`, { permanent: false, direction: 'top' });
-    cpMarkers[cp.order] = marker;
+    const key = cp.id || `${cp.raceId}_${cp.order}`;
+    cpMarkers[key] = marker;
   });
 }
 
-// تحوّل نقطة إلى حمراء عند التسجيل وتوقف الوميض
-function markCheckpointDone(order) {
+// تحوّل نقطة إلى حمراء عند التسجيل (تطابق بالـ race_id + order)
+function markCheckpointDone(order, raceId) {
   stopPulse();
-  if (cpMarkers[order]) {
-    cpMarkers[order].setStyle({ fillColor: '#E24B4A' });
-  }
+  CONFIG.CHECKPOINTS.forEach(cp => {
+    if (cp.order !== order) return;
+    if (raceId && cp.raceId !== raceId) return;
+    const key = cp.id || `${cp.raceId}_${cp.order}`;
+    if (cpMarkers[key]) cpMarkers[key].setStyle({ fillColor: '#E24B4A' });
+  });
 }
+
+function _cpKey(cp) { return cp.id || `${cp.raceId}_${cp.order}`; }
 
 // ابدأ وميض النقطة القريبة
 function startPulse(cp) {
   if (activePulseOrder === cp.order) return; // تومض بالفعل
   stopPulse();
   activePulseOrder = cp.order;
+  activePulseCp = cp;
 
   // أخفِ الدائرة العادية
-  if (cpMarkers[cp.order]) cpMarkers[cp.order].setStyle({ opacity: 0, fillOpacity: 0 });
+  const mk = cpMarkers[_cpKey(cp)];
+  if (mk) mk.setStyle({ opacity: 0, fillOpacity: 0 });
 
   const icon = L.divIcon({
     className: '',
@@ -1252,14 +1260,12 @@ function stopPulse() {
     activePulseMarker = null;
   }
   if (activePulseOrder !== null) {
-    // أعد إظهار الدائرة العادية (إذا لم تُسجَّل بعد)
-    if (cpMarkers[activePulseOrder]) {
-      const style = cpMarkers[activePulseOrder].options.fillColor === '#E24B4A'
-        ? { opacity: 1, fillOpacity: 1 }
-        : { opacity: 1, fillOpacity: 1 };
-      cpMarkers[activePulseOrder].setStyle(style);
+    if (activePulseCp) {
+      const mk = cpMarkers[_cpKey(activePulseCp)];
+      if (mk) mk.setStyle({ opacity: 1, fillOpacity: 1 });
     }
     activePulseOrder = null;
+    activePulseCp = null;
   }
 }
 
@@ -1309,7 +1315,7 @@ function updateMapPosition(lat, lng, accuracy) {
 async function loadPreviousRegistrationsOnMap(runnerId) {
   const history = await fetchRunnerHistory(runnerId);
   history.forEach(entry => {
-    if (entry.checkpoint_order) markCheckpointDone(entry.checkpoint_order);
+    if (entry.checkpoint_order) markCheckpointDone(entry.checkpoint_order, entry.race_id);
   });
 }
 
@@ -1816,7 +1822,7 @@ async function registerPosition() {
     if (nearestCp) setCpTime(nearestCp.order);
 
     // تلوين النقطة على الخريطة
-    if (nearestCp) markCheckpointDone(nearestCp.order);
+    if (nearestCp) markCheckpointDone(nearestCp.order, nearestCp.raceId);
 
     const cpLabel = nearestCp ? ` — ${nearestCp.name}` : '';
     showToast(`Registrert!${cpLabel}`, 't-success');
@@ -2044,7 +2050,7 @@ function startRealtime(runner) {
       const row = payload.new;
       // Marker nåværende brukers sjekkpunkt som fullført
       if (row.runner_id === runner.id && row.checkpoint_order) {
-        markCheckpointDone(row.checkpoint_order);
+        markCheckpointDone(row.checkpoint_order, row.race_id);
       }
       // Oppdater historikk-skuff hvis åpen
       if (document.getElementById('historyDrawer').classList.contains('open') &&
@@ -2060,6 +2066,7 @@ function startRealtime(runner) {
     }, async () => {
       await loadCheckpointsFromSupabase(raceId);
       rebuildMapMarkers();
+      if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
       drawRaceRoute();
     })
 
@@ -2069,6 +2076,7 @@ function startRealtime(runner) {
     }, async () => {
       await loadCheckpointsFromSupabase(raceId);
       rebuildMapMarkers();
+      if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
       drawRaceRoute();
     })
 
@@ -2458,7 +2466,7 @@ async function loadCheckpointsFromSupabase(adminCode) {
     const { data, error } = await query;
     if (error || !data || data.length === 0) { CONFIG.CHECKPOINTS = []; return; }
     CONFIG.CHECKPOINTS = data.map(r => ({
-      order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
+      id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
     }));
   } catch(e) { console.warn('Checkpoint load:', e); }
 }
@@ -2496,6 +2504,7 @@ async function renderCpAdminList() {
         await renderCpAdminList();
         await loadCheckpointsFromSupabase();
         rebuildMapMarkers();
+        if (currentUser?.id) await loadPreviousRegistrationsOnMap(currentUser.id);
         drawRaceRoute();
       });
     });
@@ -2532,6 +2541,7 @@ async function addCheckpoint() {
   await renderCpAdminList();
   await loadCheckpointsFromSupabase();
   rebuildMapMarkers();
+  if (currentUser?.id) await loadPreviousRegistrationsOnMap(currentUser.id);
   drawRaceRoute();
 }
 
@@ -2618,13 +2628,14 @@ function rebuildMapMarkers() {
   Object.values(cpMarkers).forEach(m => leafletMap.removeLayer(m));
   Object.keys(cpMarkers).forEach(k => delete cpMarkers[k]);
   if (activePulseMarker) { leafletMap.removeLayer(activePulseMarker); activePulseMarker = null; }
+  activePulseOrder = null; activePulseCp = null;
   CONFIG.CHECKPOINTS.forEach(cp => {
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
       fillColor: '#0EA371', fillOpacity: 1,
     }).addTo(leafletMap);
     marker.bindTooltip(`${cp.order}. ${cp.name}`, { permanent: false, direction: 'top' });
-    cpMarkers[cp.order] = marker;
+    cpMarkers[_cpKey(cp)] = marker;
   });
 }
 
