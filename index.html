@@ -824,8 +824,24 @@
 <div id="cpAdminScreen" class="screen">
   <div class="rapport-header">
     <button class="rapport-back" id="cpAdminBackBtn">← Tilbake</button>
-    <span class="rapport-title">Rediger sjekkpunkter</span>
+    <span class="rapport-title">Sjekkpunkter</span>
+    <button id="cpNewRaceHeaderBtn" class="rapport-back" style="margin-left:auto; background:var(--green); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:0.85rem; font-weight:600;">+ Nytt løp</button>
   </div>
+
+  <!-- Modal: opprett nytt løp -->
+  <div id="cpNewRaceModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:900; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:var(--radius); padding:24px; margin:20px; width:100%; max-width:360px; box-shadow:var(--shadow-lg);">
+      <div style="font-size:1.05rem; font-weight:700; color:var(--text); margin-bottom:16px;">Nytt løp</div>
+      <div class="input-label">Navn på løpet</div>
+      <input type="text" id="cpModalRaceName" placeholder="f.eks. Oslo Maraton" autocorrect="off" style="margin-bottom:12px;" />
+      <div id="cpModalRaceMsg" class="form-msg" style="display:none; margin-bottom:12px;"></div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="cpModalCancelBtn" style="flex:1; background:var(--bg); color:var(--text-2); border:1px solid var(--border);">Avbryt</button>
+        <button class="btn btn-green" id="cpModalCreateBtn" style="flex:1;">Opprett</button>
+      </div>
+    </div>
+  </div>
+
   <div class="rapport-body">
 
     <!-- 1. اختيار السباق -->
@@ -847,13 +863,7 @@
       </div>
     </div>
 
-    <!-- 2. إنشاء سباق جديد (للأدمن العادي فقط) -->
-    <div class="rapport-card" id="cpCreateRaceDiv">
-      <div class="rapport-card-title">Opprett nytt løp</div>
-      <input type="text" id="cpNewRaceName" placeholder="Navn på løpet, f.eks. Oslo Maraton" autocorrect="off" />
-      <button class="btn btn-green" id="cpAddRaceBtn" style="margin-top:10px;">+ Opprett løp</button>
-      <div id="cpRaceMsg" class="form-msg" style="display:none;margin-top:8px;"></div>
-    </div>
+    <div id="cpRaceMsg" class="form-msg" style="display:none;margin-bottom:8px;"></div>
 
     <!-- 3. نقاط السباق المختار -->
     <div id="cpAdminList"></div>
@@ -2587,8 +2597,8 @@ async function _loadCpRaceDropdown() {
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
 
   // السوبر أدمن لا يمكنه إنشاء سباقات (ليس لديه adminCode)
-  const createDiv = document.getElementById('cpCreateRaceDiv');
-  if (createDiv) createDiv.style.display = isSuperAdmin ? 'none' : '';
+  const newRaceBtn = document.getElementById('cpNewRaceHeaderBtn');
+  if (newRaceBtn) newRaceBtn.style.display = isSuperAdmin ? 'none' : '';
 
   let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
@@ -2625,14 +2635,28 @@ async function _loadCpRaceDropdown() {
   _updateRaceInfo(); // تطبيق على القيمة الحالية
 }
 
+function _openNewRaceModal() {
+  const modal = document.getElementById('cpNewRaceModal');
+  document.getElementById('cpModalRaceName').value = '';
+  document.getElementById('cpModalRaceMsg').style.display = 'none';
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('cpModalRaceName').focus(), 100);
+}
+function _closeNewRaceModal() {
+  document.getElementById('cpNewRaceModal').style.display = 'none';
+}
+
 async function createRace() {
-  const nameInput = document.getElementById('cpNewRaceName');
+  const nameInput = document.getElementById('cpModalRaceName');
   const name = nameInput.value.trim();
-  const msg  = document.getElementById('cpRaceMsg');
+  const msg  = document.getElementById('cpModalRaceMsg');
   if (!name) { showMsg(msg, 'Skriv inn et løpsnavn', 'amber'); return; }
 
   const adminCode = currentUser?.adminCode;
   if (!adminCode) { showMsg(msg, 'Ingen admin-kode funnet', 'red'); return; }
+
+  const createBtn = document.getElementById('cpModalCreateBtn');
+  createBtn.disabled = true;
 
   // Generate unique race_id
   let race_id, taken = true;
@@ -2644,12 +2668,12 @@ async function createRace() {
   }
 
   const { error } = await sbClient.from('races').insert({ admin_code: adminCode, race_id, name });
+  createBtn.disabled = false;
   if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
 
-  nameInput.value = '';
-  showMsg(msg, `Løp «${name}» opprettet!`, 'green');
+  _closeNewRaceModal();
+  showToast(`Løp «${name}» opprettet!`, 't-success', 3000);
   await _loadCpRaceDropdown();
-  // Auto-select the new race — triggers _updateRaceInfo which shows the code
   document.getElementById('cpRaceSelect').value = race_id;
   document.getElementById('cpRaceSelect').dispatchEvent(new Event('change'));
 }
@@ -2966,7 +2990,11 @@ async function init() {
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
   document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('cpAddBtn').addEventListener('click', addCheckpoint);
-  document.getElementById('cpAddRaceBtn').addEventListener('click', createRace);
+  document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', _openNewRaceModal);
+  document.getElementById('cpModalCancelBtn').addEventListener('click', _closeNewRaceModal);
+  document.getElementById('cpModalCreateBtn').addEventListener('click', createRace);
+  document.getElementById('cpModalRaceName').addEventListener('keydown', e => { if (e.key === 'Enter') createRace(); });
+  document.getElementById('cpNewRaceModal').addEventListener('click', e => { if (e.target === e.currentTarget) _closeNewRaceModal(); });
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
   document.getElementById('superAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
