@@ -2625,6 +2625,8 @@ function openNewRaceScreen() {
   showScreen('cpNewRaceScreen');
   _cpNRCurrentRaceId = null;
   document.getElementById('cpNRName').value    = '';
+  document.getElementById('cpNRName').disabled = false;
+  document.getElementById('cpNRCreateBtn').textContent = 'Opprett løp';
   document.getElementById('cpNRAddForm').style.display   = 'none';
   document.getElementById('cpNRCpList').innerHTML        = '';
   document.getElementById('cpNRCreateBtn').disabled      = false;
