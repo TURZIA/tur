@@ -2074,31 +2074,33 @@ async function onAuthSuccess(user, nameOverride) {
   let runnerAdminCode = null;  // السباق الذي يشارك فيه الراكض
   let adminOwnCode    = null;  // السباق الذي يديره كأدمن
 
-  try {
-    const { data } = await sbClient.from('runners').select('name,race_id').eq('id', user.id).single();
-    if (data?.name && !name) name = data.name;
-    if (data?.race_id) {
-      // Verify the linked admin is still active
-      const { data: activeAdmin } = await sbClient.from('admins')
-        .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).single();
-      if (activeAdmin) {
-        runnerAdminCode = data.race_id;
-      } else {
-        // Admin deactivated — clear the stale link
-        await sbClient.from('runners').update({ race_id: null }).eq('id', user.id);
-      }
-    }
-  } catch {}
-
-  if (!name) name = user.email.split('@')[0];
+  if (!name) name = user.email?.split('@')[0] || '';
 
   const isSuperAdmin = user.email === CONFIG.ADMIN_EMAIL;
 
-  // Admin-brukere: sjekk om de er admin i admins-tabellen
+  // Check admin status FIRST before touching runners table
   let isAdmin = isSuperAdmin;
   if (!isSuperAdmin) {
     const { data: aRow } = await sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).single();
     if (aRow) { isAdmin = true; adminOwnCode = aRow.admin_code; }
+  }
+
+  // Only check/clear runners link if user is NOT an admin
+  if (!isAdmin) {
+    try {
+      const { data } = await sbClient.from('runners').select('name,race_id').eq('id', user.id).single();
+      if (data?.name && !name) name = data.name;
+      if (data?.race_id) {
+        const { data: activeAdmin } = await sbClient.from('admins')
+          .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).single();
+        if (activeAdmin) {
+          runnerAdminCode = data.race_id;
+        } else {
+          // Admin deactivated — clear the stale link
+          await sbClient.from('runners').update({ race_id: null }).eq('id', user.id);
+        }
+      }
+    } catch {}
   }
 
   // الأدمن يستخدم كوده الخاص للإدارة؛ الراكض العادي يستخدم كود السباق المسجّل فيه
