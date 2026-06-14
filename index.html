@@ -1666,8 +1666,7 @@ function updateCompass(lat, lng) {
 
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const lastTime = cpTimes[cp.order];
-    if (lastTime && (now - lastTime) < COOLDOWN_MS) return;
+    if (doneCheckpoints.has(cp.order)) return; // already registered
     const d = haversineMeters(lat, lng, cp.lat, cp.lng);
     if (d < minDist) { minDist = d; target = cp; }
   });
@@ -1691,8 +1690,7 @@ function updateCompass(lat, lng) {
     if (_osrmTarget?.order !== target.order) return;
 
     // Sjekk at målet ikke ble registrert mens vi ventet
-    const fresh = getCpTimes();
-    if (fresh[target.order] && (Date.now() - fresh[target.order]) < COOLDOWN_MS) return;
+    if (doneCheckpoints.has(target.order)) return;
 
     // Nå er vi klare til å tegne — slett gammelt
     _clearArrow();
@@ -1704,11 +1702,8 @@ function updateCompass(lat, lng) {
       const n = coords.length;
       _drawArrowHead(coords[n-1], _bearing(coords[n-2][0], coords[n-2][1], coords[n-1][0], coords[n-1][1]));
       _hasRoadRoute = true;
-    } else {
-      // OSRM fant ingen rute — tegn rett linje som permanent fallback
-      _drawStraightArrow(capturedLat, capturedLng, target, capturedDist);
-      _hasRoadRoute = false;
     }
+    // OSRM failed — draw nothing, keep retrying on next GPS update
   }, OSRM_DEBOUNCE);
 }
 
