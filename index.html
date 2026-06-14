@@ -2890,7 +2890,7 @@ async function _loadCpRaceDropdown() {
 
   // السوبر أدمن لا يمكنه إنشاء سباقات (ليس لديه adminCode)
   const newRaceBtn = document.getElementById('cpNewRaceHeaderBtn');
-  if (newRaceBtn) newRaceBtn.style.display = isSuperAdmin ? 'none' : '';
+  if (newRaceBtn) newRaceBtn.style.display = '';
 
   let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
@@ -2948,6 +2948,10 @@ async function _loadCpRaceDropdown() {
 
 function openNewRaceScreen() {
   showScreen('cpNewRaceScreen');
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  // Super admin can view/delete races but not create new ones
+  const createCard = document.querySelector('#cpNewRaceScreen .rapport-card');
+  if (createCard) createCard.style.display = isSuperAdmin ? 'none' : '';
   document.getElementById('cpNRName').value    = '';
   document.getElementById('cpNRName').disabled = false;
   document.getElementById('cpNRCreateBtn').disabled = false;
@@ -2958,11 +2962,13 @@ function openNewRaceScreen() {
 async function renderNRRacesList() {
   const container = document.getElementById('cpNRRacesList');
   container.innerHTML = '<div class="list-empty">Laster…</div>';
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   const adminCode = currentUser?.adminCode;
-  if (!adminCode) { container.innerHTML = ''; return; }
+  if (!isSuperAdmin && !adminCode) { container.innerHTML = ''; return; }
 
-  const { data: races } = await sbClient.from('races')
-    .select('race_id,name,is_current').eq('admin_code', adminCode).eq('is_active', true).order('created_at');
+  let query = sbClient.from('races').select('race_id,name,is_current,admin_code').eq('is_active', true).order('created_at');
+  if (!isSuperAdmin) query = query.eq('admin_code', adminCode);
+  const { data: races } = await query;
   if (!races || races.length === 0) { container.innerHTML = ''; return; }
 
   container.innerHTML = '';
