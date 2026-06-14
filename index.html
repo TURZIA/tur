@@ -3067,6 +3067,15 @@ function _cpAdminRaceId() {
   return document.getElementById('cpRaceSelect')?.value || null;
 }
 
+async function returnToMainScreen() {
+  showScreen('mainScreen');
+  const adminCode = currentUser?.adminCode;
+  await loadCheckpointsFromSupabase(adminCode);
+  rebuildMapMarkers();
+  if (currentUser?.raceId) drawRaceRoute();
+  if (currentUser?.id) await loadPreviousRegistrationsOnMap(currentUser.id);
+}
+
 async function openCpAdminScreen() {
   showScreen('cpAdminScreen');
   await _loadCpRaceDropdown();
@@ -3726,11 +3735,11 @@ async function init() {
 
   // Rapport
   document.getElementById('rapportBtn').addEventListener('click', openRapportScreen);
-  document.getElementById('rapportBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('rapportBackBtn').addEventListener('click', returnToMainScreen);
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
-  document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('cpAdminBackBtn').addEventListener('click', returnToMainScreen);
   document.getElementById('løpereBtn').addEventListener('click', openLøpereScreen);
-  document.getElementById('løpereBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('løpereBackBtn').addEventListener('click', returnToMainScreen);
   document.getElementById('løpereAddBtn').addEventListener('click', addRunnerByEmail);
   document.getElementById('løpereShareBtn').addEventListener('click', toggleShareCode);
   document.getElementById('løpereCopyBtn').addEventListener('click', copyInviteLink);
@@ -3740,7 +3749,7 @@ async function init() {
   document.getElementById('cpNRCreateBtn').addEventListener('click', createRace);
   document.getElementById('cpNRName').addEventListener('keydown', e => { if (e.key === 'Enter') createRace(); });
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
-  document.getElementById('superAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('superAdminBackBtn').addEventListener('click', returnToMainScreen);
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
