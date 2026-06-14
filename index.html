@@ -1011,7 +1011,7 @@
 </div>
 
 <!-- ===== LINK ADMIN POPUP ===== -->
-<div id="linkAdminOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:2000; display:none; align-items:center; justify-content:center; padding:24px;">
+<div id="linkAdminOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:2000; align-items:center; justify-content:center; padding:24px;">
   <div style="background:var(--surface); border-radius:20px; padding:28px 24px; width:100%; max-width:360px; box-shadow:var(--shadow-lg);">
     <div style="font-size:1.1rem; font-weight:800; margin-bottom:6px;">Koble til arrangør</div>
     <div style="font-size:0.88rem; color:var(--muted); margin-bottom:20px;">Kontoen din er ikke koblet til noen arrangør. Skriv inn deltakerkoden du fikk fra arrangøren.</div>
@@ -1460,7 +1460,7 @@ function updateMapPosition(lat, lng, accuracy) {
       zIndexOffset: 1000,
     }).addTo(leafletMap);
     positionMarker.bindTooltip('Din posisjon', { permanent: false });
-    leafletMap.setView([sLat, sLng], 15);
+    if (CONFIG.CHECKPOINTS.length < 2) leafletMap.setView([sLat, sLng], 15);
   } else {
     positionMarker.setLatLng([sLat, sLng]);
   }
@@ -1504,7 +1504,7 @@ function updateRegisterButton(lat, lng) {
   if (CONFIG.CHECKPOINTS.length === 0) {
     stopPulse();
     btn.className = 'btn btn-gray';
-    btn.textContent = 'Ingen steder tilgjengelig';
+    btn.textContent = currentUser?.raceId ? 'Ingen steder lagt til ennå' : 'Venter på at arrangøren starter en tur';
     return;
   }
 
@@ -1946,7 +1946,7 @@ async function loadDrawerHistory() {
 
   const totalEntries = history.length;
   document.getElementById('drawerTotalCount').textContent =
-    `${raceIds.length} løp · ${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
+    `${raceIds.length} tur${raceIds.length !== 1 ? 'er' : ''} · ${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
 
   const body = document.getElementById('drawerBody');
   body.innerHTML = '';
@@ -2004,7 +2004,7 @@ async function registerPosition() {
   if (!runner) return;
 
   const btn = document.getElementById('registerBtn');
-  if (btn.classList.contains('btn-gray')) return; // بعيد عن النقطة — لا تسجّل
+  if (btn.classList.contains('btn-gray') || btn.disabled) return;
 
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div>';
@@ -2080,6 +2080,7 @@ async function registerPosition() {
         const msg = e?.message || JSON.stringify(e) || 'ukjent';
         showToast(msg, 't-error', 8000);
         console.error('Supabase:', e);
+        return;
       }
     } else {
       showToast('📵 Offline — lagret lokalt', 't-warn');
@@ -2771,9 +2772,11 @@ async function drawWinner() {
 
     // Random pick
     const winner = eligible[Math.floor(Math.random() * eligible.length)];
+    const fraStr = document.getElementById('fraDate').value;
+    const tilStr = document.getElementById('tilDate').value;
     document.getElementById('winnerName').textContent = winner;
     document.getElementById('winnerDetails').textContent =
-      `${eligible.length} deltaker${eligible.length !== 1 ? 'e' : ''} kvalifisert (besøkte alle ${totalCps} steder)`;
+      `${eligible.length} deltaker${eligible.length !== 1 ? 'e' : ''} kvalifisert (besøkte alle ${totalCps} steder)\nPeriode: ${fraStr} → ${tilStr}`;
     resultEl.style.display = '';
 
   } catch(e) {
