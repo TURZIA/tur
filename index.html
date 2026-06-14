@@ -2139,7 +2139,7 @@ async function registerPosition() {
 
     if (navigator.onLine && sbClient) {
       try {
-        await saveRunnerToSupabase(runner.id, runner.name);
+        await saveRunnerToSupabase(runner.id, runner.name, currentUser?.raceId || CONFIG.RACE_ID, currentUser?.email);
         await saveCheckInToSupabase(entry);
       } catch(e) {
         const msg = e?.message || JSON.stringify(e) || 'ukjent';
@@ -2495,12 +2495,22 @@ function startRealtime(runner) {
       event: 'UPDATE', schema: 'public', table: 'races',
     }, async payload => {
       if (payload.new?.admin_code !== adminCode) return;
-      if (!payload.new?.is_current) return;
-      await loadCheckpointsFromSupabase(adminCode);
-      rebuildMapMarkers();
-      if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
-      drawRaceRoute();
-      showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
+      if (payload.new?.is_current) {
+        if (currentUser) currentUser.raceId = payload.new.race_id;
+        await loadCheckpointsFromSupabase(adminCode);
+        rebuildMapMarkers();
+        if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
+        drawRaceRoute();
+        showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
+      } else if (payload.old?.is_current && !payload.new?.is_current) {
+        if (currentUser?.raceId === payload.new.race_id) {
+          if (currentUser) currentUser.raceId = null;
+          CONFIG.CHECKPOINTS = [];
+          rebuildMapMarkers();
+          drawRaceRoute();
+          showToast('Arrangøren har deaktivert turen', 't-warn', 3000);
+        }
+      }
     });
   }
 
@@ -2516,14 +2526,12 @@ function startRealtime(runner) {
     });
   }
 
-  // races: refresh Nytt løp and Sjekkpunkter dropdown on any race change
+  // races: refresh UI on any race change (always keep dropdown in sync)
   if (isAdmin) {
     ch.on('postgres_changes', {
       event: '*', schema: 'public', table: 'races',
     }, async () => {
-      const activeScreen = document.querySelector('.screen.active')?.id;
-      if (activeScreen === 'cpNewRaceScreen') await renderNRRacesList();
-      if (activeScreen === 'cpAdminScreen')   await _loadCpRaceDropdown();
+      await _refreshAllRaceUI();
     });
   }
 
@@ -3328,6 +3336,7 @@ async function deleteNRCp(cpId, raceId) {
   await loadNRCpList(raceId);
   await loadCheckpointsFromSupabase(currentUser?.adminCode);
   rebuildMapMarkers(); drawRaceRoute();
+  await renderCpAdminList();
 }
 
 async function addCpToRace(raceId) {
@@ -3353,6 +3362,7 @@ async function addCpToRace(raceId) {
   await loadNRCpList(raceId);
   await loadCheckpointsFromSupabase(currentUser?.adminCode);
   rebuildMapMarkers(); drawRaceRoute();
+  await renderCpAdminList();
 }
 
 async function createRace() {
@@ -3388,7 +3398,7 @@ async function createRace() {
   if (document.getElementById('cpNRAdminCode')) document.getElementById('cpNRAdminCode').value = '';
   btn.disabled = false; btn.textContent = '+ Opprett tur';
   showToast(`"${name}" opprettet!`, 't-success', 2000);
-  await renderNRRacesList();
+  await _refreshAllRaceUI();
 }
 
 async function activateRace(raceId, adminCode) {
@@ -3404,6 +3414,7 @@ async function _refreshAllRaceUI() {
   await Promise.all([
     _loadCpRaceDropdown(),
     renderNRRacesList(),
+    renderCpAdminList(),
   ]);
 }
 
@@ -3417,9 +3428,7 @@ async function deleteRace(raceId) {
   if (!confirm('Slett denne turen og alle stedene?')) return;
   await sbClient.from('checkpoints').delete().eq('race_id', raceId);
   await sbClient.from('races').update({ is_active: false, is_current: false }).eq('race_id', raceId);
-  await renderNRRacesList();
-  await _loadCpRaceDropdown();
-  await renderCpAdminList();
+  await _refreshAllRaceUI();
 }
 
 async function renderCpAdminList() {
