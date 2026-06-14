@@ -3235,35 +3235,36 @@ async function _drawRaceRouteInner() {
     }
   } catch(e) {}
 
-  // Hent fra OSRM — overview=false + steps=true gir geometri per etappe
-  const waypointStr = cps.map(cp => `${cp.lng},${cp.lat}`).join(';');
-  const url = `https://router.project-osrm.org/route/v1/foot/${waypointStr}`
-    + `?overview=false&geometries=geojson&steps=true`;
+  // Fetch each segment separately for accurate per-leg geometry
+  const segments = [];
+  for (let i = 0; i < cps.length - 1; i++) {
+    const a = cps[i], b = cps[i + 1];
+    const url = `https://router.project-osrm.org/route/v1/foot/`
+      + `${a.lng},${a.lat};${b.lng},${b.lat}`
+      + `?overview=full&geometries=geojson&steps=false`;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      const json = await res.json();
+      if (json.code === 'Ok' && json.routes?.[0]?.geometry?.coordinates) {
+        segments.push(json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+      } else {
+        segments.push(null); // segment failed
+      }
+    } catch(e) { segments.push(null); }
+  }
+
+  if (segments.every(s => s === null)) return; // all failed
 
   try {
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), 12000);
-    const res  = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(t);
-    const json = await res.json();
-
-    if (json.code !== 'Ok' || !json.routes?.[0]?.legs) return; // ikke tegn noe ved feil
-
-    const segments = json.routes[0].legs.map(leg => {
-      const pts = [];
-      (leg.steps || []).forEach(step => {
-        (step.geometry?.coordinates || []).forEach(c => pts.push([c[1], c[0]]));
-      });
-      return pts;
-    });
 
     // Lagre i cache
     try { localStorage.setItem(LS_RACE_ROUTE, JSON.stringify({ key: cacheKey, segments })); } catch(e) {}
-
     _drawSegments(cps, segments);
   } catch(e) {
     console.warn('OSRM race route feil:', e.message);
-    // Ikke tegn fallback — tegn ingenting hvis OSRM feiler
   }
 }
 
