@@ -1469,6 +1469,7 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
       localStorage.setItem(raceCompletedKey, '1');
       doneCheckpoints.clear();
       rebuildMapMarkers();
+      if (positionMarker) { const ll = positionMarker.getLatLng(); updateRegisterButton(ll.lat, ll.lng); }
     }, 10000);
   }
 }
@@ -2015,6 +2016,7 @@ async function registerPosition() {
         localStorage.setItem(`race_done_${currentUser?.id}_${currentUser?.raceId}`, '1');
         doneCheckpoints.clear();
         rebuildMapMarkers();
+        if (positionMarker) { const ll = positionMarker.getLatLng(); updateRegisterButton(ll.lat, ll.lng); }
       }, 10000);
     }
 
