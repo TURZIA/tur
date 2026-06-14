@@ -1509,7 +1509,11 @@ function onGpsSuccess(position) {
 }
 
 function onGpsError(err) {
-  if (err.code === 1) { setGpsBar('red', 'GPS-tilgang nektet'); showGpsOverlay(); }
+  if (err.code === 1) {
+    setGpsBar('red', 'GPS-tilgang nektet');
+    // On desktop, GPS is optional — don't block the screen
+    if (detectDevice() !== 'desktop') showGpsOverlay();
+  }
   else if (err.code === 2) setGpsBar('red', 'GPS ikke tilgjengelig');
   else setGpsBar('yellow', 'GPS tar tid — vent litt…');
 }
@@ -1957,8 +1961,10 @@ async function registerPosition() {
     showToast(`Registrert!${cpLabel}`, 't-success');
 
   } catch(err) {
-    if (err.code === 1) showGpsOverlay();
-    else showToast('GPS-feil: ' + (err.message || 'ukjent'), 't-error', 5000);
+    if (err.code === 1) {
+      if (detectDevice() === 'desktop') showToast('GPS-tilgang nektet. Tillat posisjon i nettleseren for å registrere.', 't-warn', 5000);
+      else showGpsOverlay();
+    } else showToast('GPS-feil: ' + (err.message || 'ukjent'), 't-error', 5000);
   } finally {
     btn.disabled = false;
     // أعد تقييم حالة الزر بناءً على الموقع الحالي
