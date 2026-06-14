@@ -2305,9 +2305,10 @@ async function handleSignup() {
   if (!email)              { showToast('Skriv inn e-post', 't-warn'); return; }
   if (password.length < 6) { showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
 
-  // Check if this email is already registered as an admin — no code needed
+  // Check if this email is super admin or already registered as an admin — no code needed
+  const isSuperAdmin = email === CONFIG.ADMIN_EMAIL;
   const { data: adminEmailRow } = await sbClient.from('admins').select('admin_code').eq('email', email).eq('is_active', true).single();
-  const isAdminSignup = !!adminEmailRow;
+  const isAdminSignup = !!adminEmailRow || isSuperAdmin;
 
   if (!isAdminSignup) {
     if (!adminCode) { showToast('Skriv inn arrangørkoden', 't-warn'); return; }
