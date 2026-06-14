@@ -880,29 +880,22 @@
 <div id="cpNewRaceScreen" class="screen">
   <div class="rapport-header">
     <button class="rapport-back" id="cpNewRaceBackBtn">← Tilbake</button>
-    <span class="rapport-title">Nytt løp</span>
+    <span class="rapport-title">Administrer løp</span>
   </div>
   <div class="rapport-body">
 
-    <!-- اسم السباق الجديد -->
+    <!-- إنشاء سباق جديد -->
     <div class="rapport-card">
-      <div class="rapport-card-title">Løpsnavn</div>
+      <div class="rapport-card-title">Nytt løp</div>
       <input type="text" id="cpNRName" placeholder="f.eks. Oslo Maraton" autocorrect="off" />
-      <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">Opprett løp</button>
+      <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">+ Opprett løp</button>
     </div>
 
-    <!-- إضافة نقاط للسباق الجديد -->
-    <div class="rapport-card" id="cpNRAddForm" style="display:none;">
-      <div class="rapport-card-title">Legg til sjekkpunkter</div>
-      <div class="input-label">Navn</div>
-      <input type="text" id="cpNRCpName" placeholder="f.eks. Toppen" autocorrect="off" />
-      <div class="input-label" style="margin-top:10px;">Koordinater</div>
-      <input type="text" id="cpNRCpCoords" placeholder='59.9510 10.7732' autocorrect="off" autocapitalize="off" inputmode="decimal" />
-      <button class="btn btn-green" id="cpNRAddCpBtn" style="margin-top:12px;">+ Legg til</button>
-    </div>
+    <!-- قائمة كل السباقات مع نقاطها -->
+    <div id="cpNRRacesList"></div>
 
-    <!-- قائمة النقاط المضافة -->
-    <div id="cpNRCpList"></div>
+    <!-- نموذج إضافة نقطة (مخفي، يُستخدم عبر JS) -->
+    <div id="cpNRAddForm" style="display:none;"></div>
 
   </div>
 </div>
@@ -2961,18 +2954,127 @@ async function _loadCpRaceDropdown() {
   _updateRaceInfo(); // تطبيق على القيمة الحالية
 }
 
-let _cpNRCurrentRaceId = null; // race_id السباق الذي يُنشأ حالياً
-
 function openNewRaceScreen() {
   showScreen('cpNewRaceScreen');
-  _cpNRCurrentRaceId = null;
   document.getElementById('cpNRName').value    = '';
   document.getElementById('cpNRName').disabled = false;
-  document.getElementById('cpNRCreateBtn').textContent = 'Opprett løp';
-  document.getElementById('cpNRAddForm').style.display   = 'none';
-  document.getElementById('cpNRCpList').innerHTML        = '';
-  document.getElementById('cpNRCreateBtn').disabled      = false;
-  setTimeout(() => document.getElementById('cpNRName').focus(), 200);
+  document.getElementById('cpNRCreateBtn').disabled = false;
+  document.getElementById('cpNRCreateBtn').textContent = '+ Opprett løp';
+  renderNRRacesList();
+}
+
+async function renderNRRacesList() {
+  const container = document.getElementById('cpNRRacesList');
+  container.innerHTML = '<div class="list-empty">Laster…</div>';
+  const adminCode = currentUser?.adminCode;
+  if (!adminCode) { container.innerHTML = ''; return; }
+
+  const { data: races } = await sbClient.from('races')
+    .select('race_id,name,is_current').eq('admin_code', adminCode).eq('is_active', true).order('created_at');
+  if (!races || races.length === 0) { container.innerHTML = ''; return; }
+
+  container.innerHTML = '';
+  for (const race of races) {
+    const card = document.createElement('div');
+    card.style.cssText = 'margin-bottom:12px; border:1px solid var(--border); border-radius:12px; overflow:hidden;';
+
+    // Race header
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--surface-2,var(--surface)); cursor:pointer;';
+    header.innerHTML = `
+      <div>
+        <div style="font-weight:700; font-size:0.95rem;">${escHtml(race.name)}</div>
+        ${race.is_current ? '<div style="font-size:0.75rem;color:var(--green-dk);margin-top:2px;">● Aktivt</div>' : ''}
+      </div>
+      <span style="color:var(--muted);">▼</span>`;
+
+    // Body (checkpoints + add form)
+    const body = document.createElement('div');
+    body.style.display = 'none';
+
+    // Checkpoints list
+    const cpList = document.createElement('div');
+    cpList.id = `nrCpList_${race.race_id}`;
+
+    // Add checkpoint form
+    const addForm = document.createElement('div');
+    addForm.style.cssText = 'padding:12px 14px; border-top:1px solid var(--border); background:var(--bg);';
+    addForm.innerHTML = `
+      <div class="rapport-card-title" style="margin-bottom:8px;">Legg til sjekkpunkt</div>
+      <div class="input-label">Navn</div>
+      <input type="text" id="nrName_${escHtml(race.race_id)}" placeholder="f.eks. Toppen" autocorrect="off" style="margin-bottom:8px;" />
+      <div class="input-label">Koordinater</div>
+      <input type="text" id="nrCoords_${escHtml(race.race_id)}" placeholder="59.9510 10.7732" autocorrect="off" autocapitalize="off" inputmode="decimal" style="margin-bottom:10px;" />
+      <button class="btn btn-green" style="padding:8px 0;" onclick="addCpToRace('${escHtml(race.race_id)}')">+ Legg til</button>`;
+
+    body.appendChild(cpList);
+    body.appendChild(addForm);
+
+    header.addEventListener('click', async () => {
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : '';
+      header.querySelector('span').textContent = open ? '▼' : '▲';
+      if (!open) await loadNRCpList(race.race_id);
+    });
+
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+  }
+}
+
+async function loadNRCpList(raceId) {
+  const el = document.getElementById(`nrCpList_${raceId}`);
+  if (!el) return;
+  el.innerHTML = '<div class="list-empty" style="padding:10px 14px;">Laster…</div>';
+  const { data } = await sbClient.from('checkpoints')
+    .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div class="list-empty" style="padding:10px 14px; border-bottom:1px solid var(--border);">Ingen sjekkpunkter ennå.</div>';
+    return;
+  }
+  el.innerHTML = data.map(cp => `
+    <div class="cp-admin-item" style="border-bottom:1px solid var(--border);">
+      <div class="cp-admin-num">${cp.cp_order}</div>
+      <div class="cp-admin-info">
+        <div class="cp-admin-name">${escHtml(cp.name)}</div>
+        <div class="cp-admin-coords">${cp.lat.toFixed(5)}, ${cp.lng.toFixed(5)}</div>
+      </div>
+      <button class="cp-admin-del" onclick="deleteNRCp('${escHtml(cp.id)}','${escHtml(raceId)}')" title="Slett">✕</button>
+    </div>`).join('');
+}
+
+async function deleteNRCp(cpId, raceId) {
+  if (!confirm('Slett dette sjekkpunktet?')) return;
+  await sbClient.from('checkpoints').delete().eq('id', cpId);
+  await loadNRCpList(raceId);
+  await loadCheckpointsFromSupabase(currentUser?.adminCode);
+  rebuildMapMarkers(); drawRaceRoute();
+}
+
+async function addCpToRace(raceId) {
+  const nameEl   = document.getElementById(`nrName_${raceId}`);
+  const coordsEl = document.getElementById(`nrCoords_${raceId}`);
+  const name = nameEl?.value.trim();
+  const coords = coordsEl?.value.trim();
+  if (!name)   { showToast('Skriv inn navn', 't-warn'); return; }
+  const pos = parseCoordsFromText(coords);
+  if (!pos)  { showToast('Ugyldig koordinater', 't-error'); return; }
+
+  const { data: ex } = await sbClient.from('checkpoints')
+    .select('cp_order').eq('race_id', raceId).order('cp_order', { ascending: false }).limit(1);
+  const nextOrder = ex && ex.length > 0 ? ex[0].cp_order + 1 : 1;
+
+  const { error } = await sbClient.from('checkpoints').insert({
+    race_id: raceId, cp_order: nextOrder, name, lat: pos.lat, lng: pos.lng,
+  });
+  if (error) { showToast('Feil: ' + error.message, 't-error'); return; }
+
+  nameEl.value = ''; coordsEl.value = '';
+  showToast(`${nextOrder}. ${name} — lagt til!`, 't-success', 1800);
+  await loadNRCpList(raceId);
+  await loadCheckpointsFromSupabase(currentUser?.adminCode);
+  rebuildMapMarkers(); drawRaceRoute();
 }
 
 async function createRace() {
@@ -2996,42 +3098,11 @@ async function createRace() {
   const { error } = await sbClient.from('races').insert({ admin_code: adminCode, race_id, name });
   if (error) { showToast('Feil: ' + error.message, 't-error'); btn.disabled = false; return; }
 
-  _cpNRCurrentRaceId = race_id;
-  document.getElementById('cpNRAddForm').style.display  = '';
-  document.getElementById('cpNRName').disabled          = true;
-  btn.textContent = '✓ Opprettet';
-}
-
-async function addCpToNewRace() {
-  if (!_cpNRCurrentRaceId) return;
-  const name   = document.getElementById('cpNRCpName').value.trim();
-  const coords = document.getElementById('cpNRCpCoords').value.trim();
-  if (!name)   { showToast('Skriv inn navn', 't-warn'); return; }
-  const pos = parseCoordsFromText(coords);
-  if (!pos)  { showToast('Ugyldig koordinater', 't-error'); return; }
-
-  const { data: ex } = await sbClient.from('checkpoints')
-    .select('cp_order').eq('race_id', _cpNRCurrentRaceId)
-    .order('cp_order', { ascending: false }).limit(1);
-  const nextOrder = ex && ex.length > 0 ? ex[0].cp_order + 1 : 1;
-
-  const { error } = await sbClient.from('checkpoints').insert({
-    race_id: _cpNRCurrentRaceId, cp_order: nextOrder, name, lat: pos.lat, lng: pos.lng,
-  });
-  if (error) { showToast('Feil: ' + error.message, 't-error'); return; }
-
-  document.getElementById('cpNRCpName').value   = '';
-  document.getElementById('cpNRCpCoords').value = '';
-  showToast(`${nextOrder}. ${name} — lagt til!`, 't-success', 1800);
-
-  // أضف للقائمة بصرياً
-  const li = document.createElement('div');
-  li.className = 'cp-admin-item';
-  li.innerHTML = `<div class="cp-admin-num">${nextOrder}</div>
-    <div class="cp-admin-info"><div class="cp-admin-name">${escHtml(name)}</div>
-    <div class="cp-admin-coords">${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}</div></div>`;
-  document.getElementById('cpNRCpList').appendChild(li);
-  document.getElementById('cpNRCpName').focus();
+  document.getElementById('cpNRName').value    = '';
+  document.getElementById('cpNRName').disabled = false;
+  btn.disabled = false; btn.textContent = '+ Opprett løp';
+  showToast(`"${name}" opprettet!`, 't-success', 2000);
+  await renderNRRacesList();
 }
 
 async function activateRace(raceId, adminCode) {
@@ -3073,29 +3144,7 @@ async function renderCpAdminList() {
           <div class="cp-admin-name">${escHtml(cp.name)}</div>
           <div class="cp-admin-coords">${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}</div>
         </div>
-        <button class="cp-admin-del" data-id="${escHtml(cp.id)}" title="Slett">✕</button>
       </div>`).join('');
-    el.querySelectorAll('.cp-admin-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Slett dette sjekkpunktet?')) return;
-        await sbClient.from('checkpoints').delete().eq('id', btn.dataset.id);
-        await renderCpAdminList();
-        // Reload map from selected race (works for both admin and super admin)
-        const selectedRaceId = _cpAdminRaceId();
-        if (selectedRaceId) {
-          const { data } = await sbClient.from('checkpoints')
-            .select('*').eq('race_id', selectedRaceId).order('cp_order', { ascending: true });
-          CONFIG.CHECKPOINTS = (data || []).map(r => ({
-            id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
-          }));
-        } else {
-          await loadCheckpointsFromSupabase(currentUser?.adminCode);
-        }
-        rebuildMapMarkers();
-        if (currentUser?.id && !isSuperAdmin) await loadPreviousRegistrationsOnMap(currentUser.id);
-        drawRaceRoute();
-      });
-    });
   } catch(e) { el.innerHTML = '<div style="color:var(--red);">Feil ved lasting.</div>'; }
 }
 
@@ -3355,18 +3404,9 @@ async function init() {
   document.getElementById('løpereAddBtn').addEventListener('click', addRunnerByEmail);
   document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', openNewRaceScreen);
   // صفحة الإنشاء الجديدة
-  document.getElementById('cpNewRaceBackBtn').addEventListener('click', async () => {
-    await openCpAdminScreen();
-    // إذا أُنشئ سباق، اختره تلقائياً
-    if (_cpNRCurrentRaceId) {
-      document.getElementById('cpRaceSelect').value = _cpNRCurrentRaceId;
-      document.getElementById('cpRaceSelect').dispatchEvent(new Event('change'));
-    }
-  });
+  document.getElementById('cpNewRaceBackBtn').addEventListener('click', () => openCpAdminScreen());
   document.getElementById('cpNRCreateBtn').addEventListener('click', createRace);
   document.getElementById('cpNRName').addEventListener('keydown', e => { if (e.key === 'Enter') createRace(); });
-  document.getElementById('cpNRAddCpBtn').addEventListener('click', addCpToNewRace);
-  document.getElementById('cpNRCpCoords').addEventListener('keydown', e => { if (e.key === 'Enter') addCpToNewRace(); });
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
   document.getElementById('superAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
