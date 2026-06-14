@@ -1484,7 +1484,7 @@ function updateRegisterButton(lat, lng) {
   const { checkpoint, distance } = findNearestCheckpoint(lat, lng);
 
   if (distance <= CONFIG.MAX_DISTANCE_METERS) {
-    if (cpOnCooldown(checkpoint.order) || doneCheckpoints.has(checkpoint.order)) {
+    if (doneCheckpoints.has(checkpoint.order)) {
       stopPulse();
       btn.className = 'btn btn-gray';
       btn.textContent = `✓ ${checkpoint.name} — allerede registrert`;
@@ -1945,7 +1945,7 @@ async function registerPosition() {
       return;
     }
 
-    if (nearestCp && cpOnCooldown(nearestCp.order)) {
+    if (nearestCp && doneCheckpoints.has(nearestCp.order)) {
       showToast(`${nearestCp.name} er allerede registrert`, 't-warn', 3000);
       return;
     }
