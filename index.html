@@ -1092,7 +1092,7 @@ async function saveCheckInToSupabase(entry) {
     accuracy_meters:  entry.accuracy,
     elapsed_seconds:  entry.elapsed_seconds,
     timestamp:        entry.timestamp,
-    race_id:          currentUser?.adminCode || CONFIG.RACE_ID,
+    race_id:          entry.race_id,
   });
   if (error) throw error;
 }
@@ -1100,10 +1100,10 @@ async function saveCheckInToSupabase(entry) {
 async function fetchLastCheckIn(runnerId) {
   if (!sbClient) return null;
   try {
-    const raceId = currentUser?.adminCode || CONFIG.RACE_ID;
-    const { data } = await sbClient
-      .from('check_ins').select('timestamp')
-      .eq('runner_id', runnerId).eq('race_id', raceId)
+    const raceId = currentUser?.raceId || null;
+    let q = sbClient.from('check_ins').select('timestamp').eq('runner_id', runnerId);
+    if (raceId) q = q.eq('race_id', raceId);
+    const { data } = await q
       .order('timestamp', { ascending: false }).limit(1).single();
     return data || null;
   } catch { return null; }
@@ -1117,6 +1117,7 @@ async function fetchRunnerHistory(runnerId) {
       .from('check_ins')
       .select('checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, timestamp, elapsed_seconds, race_id')
       .eq('runner_id', runnerId)
+      .eq('race_id', currentUser?.raceId || '')
       .order('timestamp', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -2566,7 +2567,7 @@ async function loadCheckpointsFromSupabase(adminCode) {
   try {
     // Find the admin's currently active race
     const { data: activeRace } = await sbClient.from('races')
-      .select('race_id').eq('admin_code', adminCode).eq('is_current', true).single();
+      .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).single();
     const raceId = activeRace?.race_id;
     if (!raceId) { CONFIG.CHECKPOINTS = []; return; }
 
@@ -2718,11 +2719,11 @@ async function addCpToNewRace() {
   const { error } = await sbClient.from('checkpoints').insert({
     race_id: _cpNRCurrentRaceId, cp_order: nextOrder, name, lat: pos.lat, lng: pos.lng,
   });
-  if (error) { showMsg(msg, 'Feil: ' + error.message, 'red'); return; }
+  if (error) { showToast('Feil: ' + error.message, 't-error'); return; }
 
   document.getElementById('cpNRCpName').value   = '';
   document.getElementById('cpNRCpCoords').value = '';
-  showMsg(msg, `${nextOrder}. ${name} — lagt til!`, 'green');
+  showToast(`${nextOrder}. ${name} — lagt til!`, 't-success', 1800);
 
   // أضف للقائمة بصرياً
   const li = document.createElement('div');
@@ -2744,7 +2745,7 @@ async function activateRace(raceId, adminCode) {
 
 async function deleteRace(raceId) {
   if (!confirm('Slett dette løpet? Sjekkpunktene beholdes i databasen.')) return;
-  await sbClient.from('races').update({ is_active: false }).eq('race_id', raceId);
+  await sbClient.from('races').update({ is_active: false, is_current: false }).eq('race_id', raceId);
   // reset dropdown
   document.getElementById('cpRaceSelect').value = '';
   await _loadCpRaceDropdown();
@@ -2778,7 +2779,7 @@ async function renderCpAdminList() {
         if (!confirm('Slett dette sjekkpunktet?')) return;
         await sbClient.from('checkpoints').delete().eq('id', btn.dataset.id);
         await renderCpAdminList();
-        await loadCheckpointsFromSupabase();
+        await loadCheckpointsFromSupabase(currentUser?.adminCode);
         rebuildMapMarkers();
         if (currentUser?.id) await loadPreviousRegistrationsOnMap(currentUser.id);
         drawRaceRoute();
