@@ -1103,14 +1103,15 @@ let lastTrackedPos    = null;   // آخر موقع أُضيف للمسار
 let bestRecentPos     = null;   // أدق موقع من آخر 10 ثوانٍ (للتسجيل)
 let smoothedPos       = null;   // موقع مُمهَّد بـ EMA
 
-const SMOOTH_ALPHA     = 0.35;  // أكثر نعومة لتجنب القفز
+const SMOOTH_ALPHA_MIN = 0.25;  // للقراءات غير الدقيقة (نعومة أكثر)
+const SMOOTH_ALPHA_MAX = 0.7;   // للقراءات الدقيقة جداً (ثقة أعلى)
 const MIN_TRACK_METERS = 2;     // أضف للمسار فقط إذا تحركت >2م
 
 // Smooth animation system — 60fps interpolation
 let _animTarget  = null; // { lat, lng } — الهدف الحالي من GPS
 let _animCurrent = null; // { lat, lng } — الموقع المرسوم حالياً
 let _animFrame   = null; // requestAnimationFrame ID
-const ANIM_LERP  = 0.12; // سرعة الانتقال: 0.08=ناعم جداً، 0.2=سريع
+const ANIM_LERP  = 0.18; // سرعة الانتقال: 0.08=ناعم جداً، 0.2=سريع
 
 const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
 
@@ -1434,18 +1435,26 @@ function stopPulse() {
 function updateMapPosition(lat, lng, accuracy) {
   if (!leafletMap) return;
 
+  // تجاهل القراءات غير الدقيقة جداً (>50م) إلا إذا لا يوجد موقع سابق
+  if (accuracy > 50 && smoothedPos) return;
+
   // احفظ أدق قراءة من آخر 10 ثوانٍ للتسجيل
   if (!bestRecentPos || accuracy <= bestRecentPos.accuracy
       || Date.now() - bestRecentPos.ts > 10000) {
     bestRecentPos = { lat, lng, accuracy, ts: Date.now() };
   }
 
-  // EMA smoothing على الهدف — يمنع القفز عند GPS drift
+  // Adaptive EMA — دقة أعلى = ثقة أعلى بالقراءة الجديدة
+  const alpha = accuracy <= 5  ? SMOOTH_ALPHA_MAX
+              : accuracy <= 15 ? 0.55
+              : accuracy <= 30 ? 0.4
+              :                  SMOOTH_ALPHA_MIN;
+
   if (!smoothedPos) {
     smoothedPos = { lat, lng };
   } else {
-    smoothedPos.lat = SMOOTH_ALPHA * lat + (1 - SMOOTH_ALPHA) * smoothedPos.lat;
-    smoothedPos.lng = SMOOTH_ALPHA * lng + (1 - SMOOTH_ALPHA) * smoothedPos.lng;
+    smoothedPos.lat = alpha * lat + (1 - alpha) * smoothedPos.lat;
+    smoothedPos.lng = alpha * lng + (1 - alpha) * smoothedPos.lng;
   }
 
   // حدد الهدف الجديد للـ animation
@@ -1635,14 +1644,14 @@ function startGPS() {
   if (iosWatchTimer)    { clearInterval(iosWatchTimer); iosWatchTimer = null; }
 
   setGpsBar('yellow', 'Henter GPS…');
-  const opts = { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 };
+  const opts = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
 
   try { watchId = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, opts); }
   catch(e) { setGpsBar('red', 'GPS-feil: ' + e.message); return; }
 
   if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
     iosWatchTimer = setInterval(() =>
-      navigator.geolocation.getCurrentPosition(onGpsSuccess, () => {}, opts), 10000);
+      navigator.geolocation.getCurrentPosition(onGpsSuccess, () => {}, opts), 3000);
   }
 }
 
