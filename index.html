@@ -1103,8 +1103,14 @@ let lastTrackedPos    = null;   // آخر موقع أُضيف للمسار
 let bestRecentPos     = null;   // أدق موقع من آخر 10 ثوانٍ (للتسجيل)
 let smoothedPos       = null;   // موقع مُمهَّد بـ EMA
 
-const SMOOTH_ALPHA     = 0.5;   // سرعة التمهيد: 0.3=ناعم بطيء، 0.7=سريع
+const SMOOTH_ALPHA     = 0.35;  // أكثر نعومة لتجنب القفز
 const MIN_TRACK_METERS = 2;     // أضف للمسار فقط إذا تحركت >2م
+
+// Smooth animation system — 60fps interpolation
+let _animTarget  = null; // { lat, lng } — الهدف الحالي من GPS
+let _animCurrent = null; // { lat, lng } — الموقع المرسوم حالياً
+let _animFrame   = null; // requestAnimationFrame ID
+const ANIM_LERP  = 0.12; // سرعة الانتقال: 0.08=ناعم جداً، 0.2=سريع
 
 const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
 
@@ -1424,7 +1430,7 @@ function stopPulse() {
   }
 }
 
-// تحديث موقع النقطة الزرقاء والمسار
+// تحديث موقع النقطة الزرقاء — يحدد الهدف ويبدأ animation
 function updateMapPosition(lat, lng, accuracy) {
   if (!leafletMap) return;
 
@@ -1434,7 +1440,7 @@ function updateMapPosition(lat, lng, accuracy) {
     bestRecentPos = { lat, lng, accuracy, ts: Date.now() };
   }
 
-  // تمهيد الموقع بـ EMA — يجعل الحركة سلسة بدون قفز
+  // EMA smoothing على الهدف — يمنع القفز عند GPS drift
   if (!smoothedPos) {
     smoothedPos = { lat, lng };
   } else {
@@ -1442,28 +1448,64 @@ function updateMapPosition(lat, lng, accuracy) {
     smoothedPos.lng = SMOOTH_ALPHA * lng + (1 - SMOOTH_ALPHA) * smoothedPos.lng;
   }
 
-  const sLat = smoothedPos.lat;
-  const sLng = smoothedPos.lng;
+  // حدد الهدف الجديد للـ animation
+  _animTarget = { lat: smoothedPos.lat, lng: smoothedPos.lng };
 
-  // أضف للمسار فقط إذا تحركت >2م من آخر نقطة مسجّلة
+  if (!positionMarker) {
+    _animCurrent = { lat: smoothedPos.lat, lng: smoothedPos.lng };
+    positionMarker = L.circleMarker([_animCurrent.lat, _animCurrent.lng], {
+      radius: 10, color: '#fff', weight: 3,
+      fillColor: '#3B82F6', fillOpacity: 1,
+      zIndexOffset: 1000,
+    }).addTo(leafletMap);
+    positionMarker.bindTooltip('Din posisjon', { permanent: false });
+    if (CONFIG.CHECKPOINTS.length < 2) leafletMap.setView([_animCurrent.lat, _animCurrent.lng], 15);
+    _startPositionAnimation();
+  }
+
+  // أضف للمسار
+  const sLat = smoothedPos.lat, sLng = smoothedPos.lng;
   if (!lastTrackedPos ||
       haversineMeters(lastTrackedPos[0], lastTrackedPos[1], sLat, sLng) >= MIN_TRACK_METERS) {
     lastTrackedPos = [sLat, sLng];
     trackPoints.push([sLat, sLng]);
     saveTrack();
   }
+}
 
-  if (!positionMarker) {
-    positionMarker = L.circleMarker([lat, lng], {
-      radius: 10, color: '#fff', weight: 3,
-      fillColor: '#3B82F6', fillOpacity: 1,
-      zIndexOffset: 1000,
-    }).addTo(leafletMap);
-    positionMarker.bindTooltip('Din posisjon', { permanent: false });
-    if (CONFIG.CHECKPOINTS.length < 2) leafletMap.setView([sLat, sLng], 15);
-  } else {
-    positionMarker.setLatLng([sLat, sLng]);
+// Animation loop — 60fps smooth movement
+function _startPositionAnimation() {
+  if (_animFrame) return;
+  function tick() {
+    if (!_animTarget || !_animCurrent || !positionMarker) { _animFrame = null; return; }
+
+    const dLat = _animTarget.lat - _animCurrent.lat;
+    const dLng = _animTarget.lng - _animCurrent.lng;
+
+    // إذا الفرق صغير جداً — وصلنا
+    if (Math.abs(dLat) < 1e-8 && Math.abs(dLng) < 1e-8) {
+      _animFrame = requestAnimationFrame(tick);
+      return;
+    }
+
+    // Lerp (Linear interpolation) — حرّك نسبة من المسافة كل frame
+    _animCurrent.lat += dLat * ANIM_LERP;
+    _animCurrent.lng += dLng * ANIM_LERP;
+
+    positionMarker.setLatLng([_animCurrent.lat, _animCurrent.lng]);
+
+    // حرّك بداية خط السهم مع النقطة الزرقاء
+    if (arrowLine && arrowLine.getLatLngs) {
+      const lls = arrowLine.getLatLngs();
+      if (lls.length >= 2) {
+        lls[0] = L.latLng(_animCurrent.lat, _animCurrent.lng);
+        arrowLine.setLatLngs(lls);
+      }
+    }
+
+    _animFrame = requestAnimationFrame(tick);
   }
+  _animFrame = requestAnimationFrame(tick);
 }
 
 // تحميل التسجيلات السابقة وتلوين نقاطها على الخريطة
@@ -1654,7 +1696,9 @@ let arrowHead = null;   // L.marker رأس السهم
 // OSRM state
 let _osrmTarget = null, _osrmTimer = null;
 let _hasRoadRoute = false;   // true = road route er tegnet, ikke tegn rett linje
+let _osrmLastFetchPos = null; // آخر موقع تم جلب المسار منه
 const OSRM_DEBOUNCE = 800;
+const OSRM_REFETCH_METERS = 50; // أعد جلب المسار إذا تحرك >50م
 
 function _clearArrow() {
   if (arrowLine) { leafletMap.removeLayer(arrowLine); arrowLine = null; }
@@ -1739,11 +1783,16 @@ function updateCompass(lat, lng) {
 
   if (!target) { _clearArrow(); _hasRoadRoute = false; _osrmTarget = null; return; }
 
-  // Samme mål → bevar det som er tegnet (rett linje eller veirute)
-  if (_osrmTarget?.order === target.order) return;
+  // Samme mål — re-fetch bare hvis bruker har gått >50m fra siste rute-start
+  if (_osrmTarget?.order === target.order) {
+    if (!_osrmLastFetchPos) return;
+    const moved = haversineMeters(lat, lng, _osrmLastFetchPos[0], _osrmLastFetchPos[1]);
+    if (moved < OSRM_REFETCH_METERS) return;
+  }
 
-  // Nytt mål → planlegg henting av ny rute
+  // Nytt mål eller bruker har beveget seg langt → hent ny rute
   _osrmTarget = target;
+  _osrmLastFetchPos = [lat, lng];
   clearTimeout(_osrmTimer);
 
   // Behold gammel rute synlig mens vi venter — ikke slett den ennå
