@@ -1716,7 +1716,7 @@ let arrowHead = null;   // L.marker رأس السهم
 let _osrmTarget = null, _osrmTimer = null;
 let _hasRoadRoute = false;   // true = road route er tegnet, ikke tegn rett linje
 let _osrmLastFetchPos = null; // آخر موقع تم جلب المسار منه
-const OSRM_DEBOUNCE = 500;
+const OSRM_DEBOUNCE = 200;
 const OSRM_REFETCH_METERS = 30; // أعد جلب المسار إذا تحرك >30م
 
 function _clearArrow() {
@@ -1804,16 +1804,18 @@ function updateCompass(lat, lng) {
 
   const sameTarget = _osrmTarget?.order === target.order;
 
-  // إذا لا يوجد خط مرسوم — ارسم خط مستقيم فوراً (يظهر حتى يأتي OSRM)
-  if (!arrowLine) {
-    _clearArrow();
-    _drawStraightArrow(lat, lng, target, minDist);
-  }
-
   // نفس الهدف ولم نتحرك كثيراً → الـ animation loop يحرّك بداية الخط
   if (sameTarget && _osrmLastFetchPos) {
+    // إذا لا يوجد خط — ارسم مستقيم فوراً
+    if (!arrowLine) { _drawStraightArrow(lat, lng, target, minDist); }
     const moved = haversineMeters(lat, lng, _osrmLastFetchPos[0], _osrmLastFetchPos[1]);
     if (moved < OSRM_REFETCH_METERS) return;
+  }
+
+  // هدف جديد → ارسم خط مستقيم فوراً (يُستبدل بـ OSRM لاحقاً)
+  if (!sameTarget) {
+    _clearArrow();
+    _drawStraightArrow(lat, lng, target, minDist);
   }
 
   // هدف جديد أو تحرك كبير → أعد جلب المسار
