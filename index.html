@@ -3176,8 +3176,15 @@ async function _loadCpRaceDropdown() {
     opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})${activeTag}` : `${r.name}${activeTag}`;
     sel.appendChild(opt);
   });
-  // Super admin always starts with no selection to avoid showing all checkpoints
-  if (!isSuperAdmin && prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  // اختر الرحلة السابقة أو النشطة تلقائياً
+  if (!isSuperAdmin) {
+    const activeRace = (races || []).find(r => r.is_current);
+    if (prev && [...sel.options].some(o => o.value === prev)) {
+      sel.value = prev;
+    } else if (activeRace) {
+      sel.value = activeRace.race_id;
+    }
+  }
 
   const _updateRaceInfo = async () => {
     const raceId = sel.value;
