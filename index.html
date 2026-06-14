@@ -37,7 +37,7 @@
       --green-dk: #0B7D57;
       --green-lt: #E6F9F3;
       --red:      #EF4444;
-      --amber:    #F59E0B;
+      --amber:    #C9A800;
       --bg:       #F5F7FA;
       --surface:  #FFFFFF;
       --text:     #0D1117;
@@ -405,7 +405,7 @@
     .toast.show { opacity: 1; transform: translateY(0) scale(1); }
     .toast.t-success { background: linear-gradient(135deg, #0EA371, #0B7D57); }
     .toast.t-error   { background: linear-gradient(135deg, #EF4444, #DC2626); }
-    .toast.t-warn    { background: linear-gradient(135deg, #F59E0B, #D97706); }
+    .toast.t-warn    { background: linear-gradient(135deg, #C9A800, #D97706); }
 
     /* ===== PULSING CHECKPOINT MARKER ===== */
     .cp-pulse-wrapper {
@@ -785,7 +785,7 @@
       <div class="legend-row"><div class="legend-dot" style="background:#0EA371;border:2px solid #fff;box-shadow:0 0 0 1px #0EA371"></div> Sjekkpunkt</div>
       <div class="legend-row"><div class="legend-dot" style="background:#EF4444;border:2px solid #fff;box-shadow:0 0 0 1px #EF4444"></div> Registrert</div>
       <div class="legend-row"><div class="legend-dot" style="background:#3B82F6;border:2px solid #fff;box-shadow:0 0 0 1px #3B82F6"></div> Din posisjon</div>
-      <div class="legend-row"><div style="width:20px;height:3px;background:#F97316;border-radius:2px"></div> Løpsrute</div>
+      <div class="legend-row"><div style="width:20px;height:3px;background:#C9A800;border-radius:2px"></div> Løpsrute</div>
       <div class="legend-row"><div style="width:20px;height:3px;background:#FF6B6B;border-radius:2px"></div> Neste sjekkpunkt</div>
     </div>
   </div>
@@ -2836,7 +2836,7 @@ function _drawSegments(cps, segments) {
   segments.forEach((points, i) => {
     if (!points || points.length < 2) return;
     const line = L.polyline(points, {
-      color: '#F59E0B', weight: 4, opacity: 0.78, dashArray: '10 6',
+      color: '#C9A800', weight: 4, opacity: 0.78, dashArray: '10 6',
     }).addTo(leafletMap);
     line.bringToBack();
     raceRouteSegments.push(line);
