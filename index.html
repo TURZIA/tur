@@ -839,9 +839,8 @@
         <option value="">-- Velg et løp --</option>
       </select>
       <!-- race actions -->
-      <div id="cpRaceInfo" style="display:none; margin-top:12px; gap:8px; flex-wrap:wrap; align-items:center;">
-        <button id="cpActivateRaceBtn" style="flex:1; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver for løpere</button>
-        <button id="cpDeleteRaceBtn" style="background:none;border:1px solid var(--red);border-radius:8px;padding:8px 14px;color:var(--red);font-size:0.88rem;cursor:pointer;">Slett løp</button>
+      <div id="cpRaceInfo" style="display:none; margin-top:12px;">
+        <button id="cpActivateRaceBtn" style="width:100%; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver for løpere</button>
       </div>
       <div id="cpRaceActiveBadge" style="display:none; margin-top:8px; font-size:0.8rem; color:var(--green-dk); font-weight:600;">● Aktivt løp for løpere</div>
     </div>
@@ -2911,24 +2910,17 @@ async function _loadCpRaceDropdown() {
     const raceId    = sel.value;
     const info      = document.getElementById('cpRaceInfo');
     const activateBtn = document.getElementById('cpActivateRaceBtn');
-    const delBtn    = document.getElementById('cpDeleteRaceBtn');
     const badge     = document.getElementById('cpRaceActiveBadge');
     if (raceId) {
-      info.style.display = 'flex';
+      info.style.display = isSuperAdmin ? 'none' : '';
       badge.style.display = 'none';
       if (activateBtn) {
-        activateBtn.style.display = isSuperAdmin ? 'none' : '';
         activateBtn.onclick = async () => {
           await activateRace(raceId, currentUser.adminCode);
           badge.style.display = '';
           badge.textContent   = '● Aktivt løp for løpere';
         };
       }
-      if (delBtn) {
-        delBtn.style.display = isSuperAdmin ? 'none' : '';
-        delBtn.onclick = () => deleteRace(raceId);
-      }
-      // Check if already active
       const { data: r } = await sbClient.from('races').select('is_current').eq('race_id', raceId).single();
       if (r?.is_current && badge) { badge.style.display = ''; badge.textContent = '● Aktivt løp for løpere'; }
     } else {
@@ -2982,10 +2974,11 @@ async function renderNRRacesList() {
     const header = document.createElement('div');
     header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--surface-2,var(--surface)); cursor:pointer;';
     header.innerHTML = `
-      <div>
+      <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:0.95rem;">${escHtml(race.name)}</div>
         ${race.is_current ? '<div style="font-size:0.75rem;color:var(--green-dk);margin-top:2px;">● Aktivt</div>' : ''}
       </div>
+      <button onclick="event.stopPropagation();deleteRace('${escHtml(race.race_id)}')" style="background:none;border:1px solid var(--red);border-radius:8px;padding:4px 10px;color:var(--red);font-size:0.78rem;cursor:pointer;margin-right:8px;">Slett</button>
       <span style="color:var(--muted);">▼</span>`;
 
     // Body (checkpoints + add form)
@@ -3115,10 +3108,10 @@ async function activateRace(raceId, adminCode) {
 }
 
 async function deleteRace(raceId) {
-  if (!confirm('Slett dette løpet? Sjekkpunktene beholdes i databasen.')) return;
+  if (!confirm('Slett dette løpet og alle sjekkpunktene?')) return;
+  await sbClient.from('checkpoints').delete().eq('race_id', raceId);
   await sbClient.from('races').update({ is_active: false, is_current: false }).eq('race_id', raceId);
-  // reset dropdown
-  document.getElementById('cpRaceSelect').value = '';
+  await renderNRRacesList();
   await _loadCpRaceDropdown();
   await renderCpAdminList();
 }
