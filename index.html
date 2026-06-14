@@ -2071,9 +2071,10 @@ async function onAuthSuccess(user, nameOverride) {
 
   currentUser = { id: user.id, name, email: user.email, adminCode };
 
-  document.getElementById('rapportBtn').style.display   = isAdmin ? '' : 'none';
-  document.getElementById('cpAdminBtn').style.display   = isAdmin ? '' : 'none';
+  document.getElementById('rapportBtn').style.display    = isAdmin ? '' : 'none';
+  document.getElementById('cpAdminBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('superAdminBtn').style.display = isSuperAdmin ? '' : 'none';
+  document.getElementById('registerBtn').style.display   = isSuperAdmin ? 'none' : '';
 
   await loadCheckpointsFromSupabase(adminCode);
   startMainScreen(currentUser);
