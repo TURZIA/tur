@@ -793,7 +793,7 @@
       <div class="legend-row"><div class="legend-dot" style="background:#EF4444;border:2px solid #fff;box-shadow:0 0 0 1px #EF4444"></div> Registrert</div>
       <div class="legend-row"><div class="legend-dot" style="background:#3B82F6;border:2px solid #fff;box-shadow:0 0 0 1px #3B82F6"></div> Din posisjon</div>
       <div class="legend-row"><div style="width:20px;height:3px;background:#C9A800;border-radius:2px"></div> Løpsrute</div>
-      <div class="legend-row"><div style="width:20px;height:3px;background:#FF6B6B;border-radius:2px"></div> Neste sjekkpunkt</div>
+      <div class="legend-row" id="legendNextCp"><div style="width:20px;height:3px;background:#FF6B6B;border-radius:2px"></div> Neste sjekkpunkt</div>
     </div>
   </div>
 
@@ -881,10 +881,7 @@
 
   </div>
 </div>
-    </div>
 
-  </div>
-</div>
 
 <!-- ===== RAPPORT SCREEN ===== -->
 <div id="rapportScreen" class="screen">
@@ -2092,10 +2089,15 @@ async function onAuthSuccess(user, nameOverride) {
   document.getElementById('cpAdminBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('superAdminBtn').style.display = isSuperAdmin ? '' : 'none';
   document.querySelector('.register-wrap').style.display  = isSuperAdmin ? 'none' : '';
+  document.getElementById('legendNextCp').style.display   = isSuperAdmin ? 'none' : '';
   document.getElementById('historikkBtn').style.display  = isSuperAdmin ? 'none' : '';
   document.getElementById('statusBtn').style.display     = isSuperAdmin ? '' : 'none';
 
   await loadCheckpointsFromSupabase(adminCode);
+  // Warn runner if no active race yet
+  if (!isSuperAdmin && !isAdmin && !currentUser?.raceId) {
+    setTimeout(() => showToast('Arrangøren har ikke aktivert noe løp ennå', 't-warn', 5000), 1500);
+  }
   startMainScreen(currentUser);
 }
 
@@ -2159,7 +2161,7 @@ function startRealtime(runner) {
       }
       if (document.getElementById('historyDrawer').classList.contains('open') &&
           row.runner_id === runner.id) {
-        loadHistoryDrawer(runner.id);
+        loadDrawerHistory();
       }
     });
   }
@@ -2188,6 +2190,22 @@ function startRealtime(runner) {
     if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
     drawRaceRoute();
   });
+
+  // races UPDATE: runner detects when admin activates a new race
+  if (!isSuperAdmin && adminCode) {
+    ch.on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'races',
+      filter: `admin_code=eq.${adminCode}`,
+    }, async payload => {
+      if (!payload.new?.is_current) return;
+      // Admin activated this race — reload checkpoints
+      await loadCheckpointsFromSupabase(adminCode);
+      rebuildMapMarkers();
+      if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
+      drawRaceRoute();
+      showToast('Arrangøren har aktivert et nytt løp', 't-success', 3000);
+    });
+  }
 
   realtimeChannel = ch.subscribe();
 }
@@ -3019,7 +3037,7 @@ async function refreshCurrentScreen() {
     rebuildMapMarkers();
     if (currentUser) await loadPreviousRegistrationsOnMap(currentUser.id);
     if (document.getElementById('historyDrawer').classList.contains('open') && currentUser)
-      await loadHistoryDrawer(currentUser.id);
+      await loadDrawerHistory();
   } else if (active === 'cpAdminScreen') {
     await renderCpAdminList();
   } else if (active === 'superAdminScreen') {
