@@ -894,6 +894,14 @@
       </select>
     </div>
 
+    <!-- Velg løp -->
+    <div class="rapport-card" id="rapportRaceCard" style="display:none;">
+      <div class="rapport-card-title">Velg løp</div>
+      <select id="rapportRaceSelect" class="form-select">
+        <option value="">-- Alle løp --</option>
+      </select>
+    </div>
+
     <div class="rapport-card">
       <div class="date-fields-row">
         <div class="date-field-wrap">
@@ -2272,10 +2280,15 @@ async function fetchRapportData() {
     return null;
   }
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-  const selectedCode = document.getElementById('adminSelect')?.value;
-  const raceId = isSuperAdmin
-    ? (selectedCode || null)
-    : (selectedCode || currentUser?.adminCode || CONFIG.RACE_ID);
+  const selectedAdminCode = document.getElementById('adminSelect')?.value || null;
+  const selectedRaceId    = document.getElementById('rapportRaceSelect')?.value || null;
+
+  // Filter by specific race if chosen; otherwise filter by admin (all their races)
+  let raceId    = selectedRaceId || null;
+  let adminCode = null;
+  if (!raceId) {
+    adminCode = isSuperAdmin ? selectedAdminCode : (currentUser?.adminCode || null);
+  }
 
   let query = sbClient
     .from('check_ins')
@@ -2284,7 +2297,13 @@ async function fetchRapportData() {
     .lte('timestamp', til.toISOString())
     .order('timestamp', { ascending: true });
 
-  if (raceId) query = query.eq('race_id', raceId);
+  if (raceId)    query = query.eq('race_id', raceId);
+  else if (adminCode) {
+    // Get all race_ids for this admin and filter
+    const { data: races } = await sbClient.from('races').select('race_id').eq('admin_code', adminCode);
+    const ids = (races || []).map(r => r.race_id);
+    if (ids.length > 0) query = query.in('race_id', ids);
+  }
 
   const { data, error } = await query;
   if (error) throw error;
@@ -2389,34 +2408,39 @@ async function openRapportScreen() {
   document.getElementById('leaderboard').style.display = 'none';
 
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-  const card = document.getElementById('adminSelectCard');
-  const sel  = document.getElementById('adminSelect');
+  const adminCard  = document.getElementById('adminSelectCard');
+  const raceCard   = document.getElementById('rapportRaceCard');
+  const adminSel   = document.getElementById('adminSelect');
+  const raceSel    = document.getElementById('rapportRaceSelect');
+
+  const _loadRacesForAdmin = async (adminCode) => {
+    raceSel.innerHTML = '<option value="">-- Alle løp --</option>';
+    if (!adminCode) { raceCard.style.display = 'none'; return; }
+    const { data } = await sbClient.from('races').select('race_id,name').eq('admin_code', adminCode).eq('is_active', true).order('created_at');
+    (data || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.race_id; opt.textContent = r.name;
+      raceSel.appendChild(opt);
+    });
+    raceCard.style.display = (data && data.length > 0) ? '' : 'none';
+    if (data?.length === 1) raceSel.value = data[0].race_id;
+  };
 
   if (isSuperAdmin) {
-    card.style.display = '';
-    // تحميل كل الأدمنز بما فيهم المحذوفون لرؤية التقارير التاريخية
+    adminCard.style.display = '';
     const { data } = await sbClient.from('admins').select('email,admin_code,is_active').order('created_at');
-    sel.innerHTML = '<option value="">-- Velg admin --</option>';
+    adminSel.innerHTML = '<option value="">-- Velg admin --</option>';
     (data || []).forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.admin_code;
       opt.textContent = `${a.email} (${a.admin_code})${a.is_active ? '' : ' — deaktivert'}`;
-      sel.appendChild(opt);
+      adminSel.appendChild(opt);
     });
-  } else if (currentUser?.adminCode) {
-    // Regular admin: show their races
-    card.style.display = '';
-    const { data: myRaces } = await sbClient.from('races').select('race_id,name').eq('admin_code', currentUser.adminCode).eq('is_active', true).order('created_at');
-    sel.innerHTML = '<option value="">-- Alle løp --</option>';
-    (myRaces || []).forEach(r => {
-      const opt = document.createElement('option');
-      opt.value = r.race_id; opt.textContent = r.name;
-      sel.appendChild(opt);
-    });
-    // Auto-select if only one race
-    if (myRaces?.length === 1) sel.value = myRaces[0].race_id;
+    adminSel.onchange = () => _loadRacesForAdmin(adminSel.value);
+    raceCard.style.display = 'none';
   } else {
-    card.style.display = 'none';
+    adminCard.style.display = 'none';
+    await _loadRacesForAdmin(currentUser?.adminCode);
   }
 
   showScreen('rapportScreen');
