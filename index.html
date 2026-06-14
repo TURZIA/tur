@@ -184,6 +184,16 @@
       font-size: 1rem; font-weight: 700;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .progress-badge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
+    }
     .historikk-btn {
       background: rgba(255,255,255,0.18);
       border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 8px;
@@ -756,6 +766,7 @@
     <div class="header-row1">
       <div class="header-left">
         <span class="race-name" id="headerRaceName">TUR</span>
+        <span class="progress-badge" id="progressBadge" style="display:none;">0/0</span>
       </div>
       <div class="runner-info">
         <span class="runner-name-display" id="headerRunnerName"></span>
@@ -839,7 +850,7 @@
         <option value="">-- Velg en tur --</option>
       </select>
       <!-- race actions -->
-      <div id="cpRaceInfo" style="display:none; margin-top:12px; display:flex; gap:8px;">
+      <div id="cpRaceInfo" style="display:none; margin-top:12px; gap:8px;">
         <button id="cpActivateRaceBtn" style="flex:1; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver</button>
         <button id="cpDeactivateRaceBtn" style="flex:1; background:none; border:1px solid var(--muted); border-radius:8px; padding:8px 14px; font-size:0.88rem; color:var(--muted); cursor:pointer;">✗ Deaktiver</button>
       </div>
@@ -861,9 +872,17 @@
   <div class="rapport-body">
 
     <div class="rapport-card">
-      <div id="løpereCount" style="font-size:1.1rem; font-weight:700; margin-bottom:16px;">0 deltakere</div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div id="løpereCount" style="font-size:1.1rem; font-weight:700;">0 deltakere</div>
+        <button id="løpereShareBtn" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">Del kode</button>
+      </div>
+      <div id="løpereShareInfo" style="display:none; margin-top:12px; background:var(--green-lt); border-radius:10px; padding:12px 14px;">
+        <div style="font-size:0.8rem; color:var(--muted); margin-bottom:6px;">Deltakerkode:</div>
+        <div id="løpereCodeDisplay" style="font-size:1.4rem; font-weight:800; letter-spacing:0.12em; color:var(--green-dk); text-align:center;"></div>
+        <button id="løpereCopyBtn" style="width:100%; margin-top:10px; background:var(--green); color:#fff; border:none; border-radius:8px; padding:9px; font-size:0.88rem; font-weight:600; cursor:pointer;">Kopier invitasjonslenke</button>
+      </div>
       <!-- Add runner by email -->
-      <div class="input-label">Legg til deltaker via e-post</div>
+      <div class="input-label" style="margin-top:14px;">Legg til deltaker via e-post</div>
       <div style="display:flex; gap:8px; margin-top:4px;">
         <input type="email" id="løpereAddEmail" placeholder="deltaker@epost.no" autocorrect="off" autocapitalize="off" style="flex:1;" />
         <button id="løpereAddBtn" style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.88rem;font-weight:600;cursor:pointer;white-space:nowrap;">+ Legg til</button>
@@ -947,6 +966,18 @@
 
     <button class="btn btn-green" id="genRapportBtn">Last ned Excel-rapport</button>
     <button class="btn btn-blue" id="sendRapportBtn">Send til e-post</button>
+
+    <!-- Lottery / Trekning -->
+    <div class="rapport-card" style="margin-top:8px;">
+      <div class="rapport-card-title">Månedlig trekning</div>
+      <p style="font-size:0.82rem; color:var(--muted); margin-bottom:10px;">Trekk en tilfeldig vinner blant deltakere som har besøkt alle steder i perioden.</p>
+      <button class="btn btn-green" id="drawWinnerBtn" style="background:linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%); box-shadow:0 4px 14px rgba(139,92,246,0.35);">Trekk vinner</button>
+      <div id="winnerResult" style="display:none; margin-top:14px; text-align:center; padding:16px; background:linear-gradient(135deg, #F5F3FF, #EDE9FE); border-radius:12px; border:1px solid rgba(139,92,246,0.2);">
+        <div style="font-size:0.8rem; color:var(--muted); margin-bottom:4px;">Vinneren er:</div>
+        <div id="winnerName" style="font-size:1.4rem; font-weight:800; color:#6D28D9;"></div>
+        <div id="winnerDetails" style="font-size:0.82rem; color:var(--muted); margin-top:4px;"></div>
+      </div>
+    </div>
 
   </div>
 </div>
@@ -1316,10 +1347,14 @@ function initMap() {
     maxZoom: 19,
   }).addTo(leafletMap);
 
-  // Track ikke tegnet — ingen grønn linje
-
-  // رسم نقاط السباق الـ 20
+  // رسم نقاط السباق
   drawCheckpointMarkers();
+
+  // Zoom to fit all checkpoints if available
+  if (CONFIG.CHECKPOINTS.length >= 2) {
+    const bounds = L.latLngBounds(CONFIG.CHECKPOINTS.map(cp => [cp.lat, cp.lng]));
+    leafletMap.fitBounds(bounds, { padding: [40, 40] });
+  }
 }
 
 function drawCheckpointMarkers() {
@@ -1424,7 +1459,7 @@ function updateMapPosition(lat, lng, accuracy) {
       fillColor: '#3B82F6', fillOpacity: 1,
       zIndexOffset: 1000,
     }).addTo(leafletMap);
-    positionMarker.bindTooltip('موقعك الحالي', { permanent: false });
+    positionMarker.bindTooltip('Din posisjon', { permanent: false });
     leafletMap.setView([sLat, sLng], 15);
   } else {
     positionMarker.setLatLng([sLat, sLng]);
@@ -1448,17 +1483,7 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
       latestByOrder[o] = entry;
   });
 
-  const totalCps   = CONFIG.CHECKPOINTS.length;
-  const allOrders  = CONFIG.CHECKPOINTS.map(cp => cp.order);
-  const doneOrders = Object.keys(latestByOrder).map(Number);
-  const allDone    = totalCps > 0 && allOrders.every(o => doneOrders.includes(o));
-
-  if (allDone) {
-    // Race already completed — show fresh green start, no red markers
-    return;
-  }
-
-  // Mark only today's check-ins as done; previous days reset to green
+  // Mark only today's check-ins as done
   Object.entries(latestByOrder).forEach(([order, entry]) => {
     const doneToday = new Date(entry.timestamp).toDateString() === today;
     if (doneToday) {
@@ -1466,6 +1491,7 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
       doneCheckpoints.add(Number(order));
     }
   });
+  updateProgressBadge();
 }
 
 /* ============================================================
@@ -1605,6 +1631,19 @@ function findNearestCheckpoint(lat, lng) {
 }
 
 function _invalidateNearestCache() { _nearestCache = null; }
+
+function updateProgressBadge() {
+  const badge = document.getElementById('progressBadge');
+  if (!badge) return;
+  const total = CONFIG.CHECKPOINTS.length;
+  if (total === 0 || currentUser?.email === CONFIG.ADMIN_EMAIL) {
+    badge.style.display = 'none';
+    return;
+  }
+  const done = doneCheckpoints.size;
+  badge.textContent = `${done}/${total}`;
+  badge.style.display = '';
+}
 
 /* ============================================================
    MAP ARROW — from blue dot to nearest unregistered checkpoint
@@ -2051,6 +2090,7 @@ async function registerPosition() {
 
     // تلوين النقطة على الخريطة
     if (nearestCp) markCheckpointDone(nearestCp.order, nearestCp.raceId);
+    updateProgressBadge();
 
     const cpLabel = nearestCp ? ` — ${nearestCp.name}` : '';
     showToast(`Registrert!${cpLabel}`, 't-success');
@@ -2058,12 +2098,7 @@ async function registerPosition() {
     // Check if all checkpoints are now done
     const allOrders = CONFIG.CHECKPOINTS.map(cp => cp.order);
     if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
-      setTimeout(() => showToast('Gratulerer! Du har besøkt alle steder denne måneden! 🎉', 't-success', 8000), 1500);
-      setTimeout(() => {
-        doneCheckpoints.clear();
-        rebuildMapMarkers();
-        if (positionMarker) { const ll = positionMarker.getLatLng(); updateRegisterButton(ll.lat, ll.lng); }
-      }, 10000);
+      setTimeout(() => showToast('Gratulerer! Du har besøkt alle steder i dag! 🎉', 't-success', 8000), 1500);
     }
 
   } catch(err) {
@@ -2582,6 +2617,11 @@ async function fetchRapportData() {
   if (!raceId) {
     adminCode = isSuperAdmin ? selectedAdminCode : (currentUser?.adminCode || null);
   }
+  // Super admin must select an admin or race to avoid fetching everything
+  if (isSuperAdmin && !raceId && !adminCode) {
+    showToast('Velg en admin eller tur først', 't-warn');
+    return null;
+  }
 
   let query = sbClient
     .from('check_ins')
@@ -2695,10 +2735,60 @@ async function sendRapportEmail() {
   }
 }
 
+async function drawWinner() {
+  const btn = document.getElementById('drawWinnerBtn');
+  const resultEl = document.getElementById('winnerResult');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  resultEl.style.display = 'none';
+
+  try {
+    const result = await fetchRapportData();
+    if (!result) return;
+    const { data } = result;
+    if (data.length === 0) { showToast('Ingen registreringer i perioden', 't-warn'); return; }
+
+    // Find participants who visited ALL unique checkpoints in the period
+    const uniqueCps = new Set(data.map(r => r.checkpoint_order).filter(Boolean));
+    const totalCps = uniqueCps.size;
+    if (totalCps === 0) { showToast('Ingen sjekkpunkter funnet', 't-warn'); return; }
+
+    const byRunner = {};
+    data.forEach(row => {
+      if (!row.runner_name) return;
+      if (!byRunner[row.runner_name]) byRunner[row.runner_name] = new Set();
+      if (row.checkpoint_order) byRunner[row.runner_name].add(row.checkpoint_order);
+    });
+
+    const eligible = Object.entries(byRunner)
+      .filter(([_, cps]) => cps.size >= totalCps)
+      .map(([name]) => name);
+
+    if (eligible.length === 0) {
+      showToast(`Ingen deltakere besøkte alle ${totalCps} steder`, 't-warn', 5000);
+      return;
+    }
+
+    // Random pick
+    const winner = eligible[Math.floor(Math.random() * eligible.length)];
+    document.getElementById('winnerName').textContent = winner;
+    document.getElementById('winnerDetails').textContent =
+      `${eligible.length} deltaker${eligible.length !== 1 ? 'e' : ''} kvalifisert (besøkte alle ${totalCps} steder)`;
+    resultEl.style.display = '';
+
+  } catch(e) {
+    showToast('' + (e.message || 'Feil'), 't-error', 5000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Trekk vinner';
+  }
+}
+
 async function openRapportScreen() {
   populateDateSelects();
   document.getElementById('rapportResult').style.display = 'none';
   document.getElementById('leaderboard').style.display = 'none';
+  document.getElementById('winnerResult').style.display = 'none';
 
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   const adminCard  = document.getElementById('adminSelectCard');
@@ -2934,6 +3024,28 @@ async function removeRunner(runnerId) {
   await loadLøpereList();
 }
 
+function toggleShareCode() {
+  const info = document.getElementById('løpereShareInfo');
+  const isVisible = info.style.display !== 'none';
+  if (isVisible) { info.style.display = 'none'; return; }
+  info.style.display = '';
+  document.getElementById('løpereCodeDisplay').textContent = currentUser?.adminCode || '—';
+}
+
+function copyInviteLink() {
+  const code = currentUser?.adminCode;
+  if (!code) return;
+  const url = window.location.origin + window.location.pathname;
+  const text = `Bli med på TUR! Last ned appen her: ${url}\n\nBruk deltakerkode: ${code}`;
+  if (navigator.share) {
+    navigator.share({ title: 'TUR — Invitasjon', text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('Kopiert!', 't-success', 2000));
+  } else {
+    showToast(code, 't-success', 4000);
+  }
+}
+
 async function addRunnerByEmail() {
   const emailInput = document.getElementById('løpereAddEmail');
   const msgEl = document.getElementById('løpereAddMsg');
@@ -2987,7 +3099,7 @@ async function _loadCpRaceDropdown() {
     const info   = document.getElementById('cpRaceInfo');
     const badge  = document.getElementById('cpRaceActiveBadge');
     if (raceId) {
-      info.style.display = isSuperAdmin ? 'none' : 'flex';
+      info.style.display = isSuperAdmin ? 'none' : 'flex'; info.style.gap = '8px';
       badge.style.display = 'none';
       const activateBtn   = document.getElementById('cpActivateRaceBtn');
       const deactivateBtn = document.getElementById('cpDeactivateRaceBtn');
@@ -3346,6 +3458,11 @@ function rebuildMapMarkers() {
     marker.bindTooltip(`${cp.order}. ${cp.name}`, { permanent: false, direction: 'top' });
     cpMarkers[_cpKey(cp)] = marker;
   });
+  if (CONFIG.CHECKPOINTS.length >= 2) {
+    const bounds = L.latLngBounds(CONFIG.CHECKPOINTS.map(cp => [cp.lat, cp.lng]));
+    leafletMap.fitBounds(bounds, { padding: [40, 40] });
+  }
+  updateProgressBadge();
 }
 
 /* ============================================================
@@ -3507,6 +3624,8 @@ async function init() {
   document.getElementById('løpereBtn').addEventListener('click', openLøpereScreen);
   document.getElementById('løpereBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('løpereAddBtn').addEventListener('click', addRunnerByEmail);
+  document.getElementById('løpereShareBtn').addEventListener('click', toggleShareCode);
+  document.getElementById('løpereCopyBtn').addEventListener('click', copyInviteLink);
   document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', openNewRaceScreen);
   // صفحة الإنشاء الجديدة
   document.getElementById('cpNewRaceBackBtn').addEventListener('click', () => openCpAdminScreen());
@@ -3517,6 +3636,7 @@ async function init() {
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
   document.getElementById('genRapportBtn').addEventListener('click', generateRapport);
   document.getElementById('sendRapportBtn').addEventListener('click', sendRapportEmail);
+  document.getElementById('drawWinnerBtn').addEventListener('click', drawWinner);
 
   // إذا كان اللينك منتهي الصلاحية → أظهر رسالة واضحة
   if (window.location.hash.includes('error=access_denied') || window.location.hash.includes('otp_expired')) {
