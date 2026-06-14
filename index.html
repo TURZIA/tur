@@ -2846,6 +2846,7 @@ function updateRaceRouteColors() { /* farger er fjernet */ }
 let _drawingRoute = false;
 async function drawRaceRoute() {
   if (!leafletMap || _drawingRoute) return;
+  if (currentUser?.email === CONFIG.ADMIN_EMAIL) return; // super admin sees all races, no single route
   _drawingRoute = true;
   _clearRaceRoute();
   try { await _drawRaceRouteInner(); } finally { _drawingRoute = false; }
