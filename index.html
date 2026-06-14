@@ -1423,12 +1423,37 @@ function updateMapPosition(lat, lng, accuracy) {
 async function loadPreviousRegistrationsOnMap(runnerId) {
   doneCheckpoints.clear();
   const history = await fetchRunnerHistory(runnerId);
+  if (!history.length) return;
+
+  const today = new Date().toDateString();
+
+  // Latest check-in per checkpoint
+  const latestByOrder = {};
   history.forEach(entry => {
-    if (entry.checkpoint_order) {
-      markCheckpointDone(entry.checkpoint_order, entry.race_id);
-      doneCheckpoints.add(entry.checkpoint_order);
-    }
+    if (!entry.checkpoint_order) return;
+    const o = entry.checkpoint_order;
+    if (!latestByOrder[o] || entry.timestamp > latestByOrder[o].timestamp)
+      latestByOrder[o] = entry;
   });
+
+  const totalCps   = CONFIG.CHECKPOINTS.length;
+  const allOrders  = CONFIG.CHECKPOINTS.map(cp => cp.order);
+  const doneOrders = Object.keys(latestByOrder).map(Number);
+  const allDone    = totalCps > 0 && allOrders.every(o => doneOrders.includes(o));
+
+  Object.entries(latestByOrder).forEach(([order, entry]) => {
+    const doneToday = new Date(entry.timestamp).toDateString() === today;
+    if (allDone || doneToday) {
+      // All done (permanent) OR done today → mark as done
+      markCheckpointDone(Number(order), entry.race_id);
+      doneCheckpoints.add(Number(order));
+    }
+    // else: done on a previous day and race not finished → checkpoint resets to green
+  });
+
+  if (allDone) {
+    setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1000);
+  }
 }
 
 /* ============================================================
@@ -1964,6 +1989,12 @@ async function registerPosition() {
 
     const cpLabel = nearestCp ? ` — ${nearestCp.name}` : '';
     showToast(`Registrert!${cpLabel}`, 't-success');
+
+    // Check if all checkpoints are now done
+    const allOrders = CONFIG.CHECKPOINTS.map(cp => cp.order);
+    if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
+      setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1500);
+    }
 
   } catch(err) {
     if (err.code === 1) {
