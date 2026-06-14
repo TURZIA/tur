@@ -2091,7 +2091,7 @@ async function onAuthSuccess(user, nameOverride) {
   document.getElementById('rapportBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('cpAdminBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('superAdminBtn').style.display = isSuperAdmin ? '' : 'none';
-  document.getElementById('registerBtn').style.display   = isSuperAdmin ? 'none' : '';
+  document.querySelector('.register-wrap').style.display  = isSuperAdmin ? 'none' : '';
   document.getElementById('historikkBtn').style.display  = isSuperAdmin ? 'none' : '';
   document.getElementById('statusBtn').style.display     = isSuperAdmin ? '' : 'none';
 
