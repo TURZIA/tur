@@ -18,7 +18,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="TUR" />
   <meta name="description" content="Registrer besøk ved tursteder og delta i månedlig trekning" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='sky' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231a3a5c'/%3E%3Cstop offset='1' stop-color='%232d6a8f'/%3E%3C/linearGradient%3E%3ClinearGradient id='sea' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231D9E75'/%3E%3Cstop offset='1' stop-color='%230d6b50'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='28' fill='url(%23sky)'/%3E%3Crect y='110' width='180' height='70' rx='0' fill='url(%23sea)'/%3E%3Cpath d='M10 115 Q45 100 90 108 Q135 116 170 108 L170 180 L10 180 Z' fill='%231D9E75' opacity='0.7'/%3E%3Cpath d='M10 122 Q50 112 90 118 Q130 124 170 115 L170 180 L10 180 Z' fill='%230d6b50' opacity='0.5'/%3E%3Cellipse cx='90' cy='68' rx='16' ry='18' fill='%23c8a882'/%3E%3Cpath d='M74 86 Q90 78 106 86 L112 130 Q90 120 68 130 Z' fill='%23b8956a'/%3E%3Cpath d='M68 130 Q90 122 112 130 L108 180 L72 180 Z' fill='%23a07850'/%3E%3Cpath d='M74 88 Q60 95 55 115 Q58 118 65 115 Q70 100 78 95 Z' fill='%23b8956a'/%3E%3Cpath d='M106 88 Q120 95 125 115 Q122 118 115 115 Q110 100 102 95 Z' fill='%23b8956a'/%3E%3Cellipse cx='84' cy='66' rx='5' ry='5' fill='%23333'/%3E%3Cellipse cx='96' cy='66' rx='5' ry='5' fill='%23333'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="logo.jpeg" />
+  <link rel="icon" type="image/jpeg" href="logo.jpeg" />
   <title>TUR</title>
 
   <!-- Supabase -->
@@ -662,20 +663,7 @@
 <!-- ===== LOGIN ===== -->
 <div id="loginScreen" class="screen">
   <div class="login-logo">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="80" height="80" style="border-radius:20px">
-      <defs>
-        <linearGradient id="lg-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a3a5c"/><stop offset="1" stop-color="#2d6a8f"/></linearGradient>
-        <linearGradient id="lg-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D9E75"/><stop offset="1" stop-color="#0d6b50"/></linearGradient>
-      </defs>
-      <rect width="120" height="120" rx="20" fill="url(#lg-sky)"/>
-      <rect y="75" width="120" height="45" fill="url(#lg-sea)"/>
-      <path d="M0 78 Q30 68 60 74 Q90 80 120 70 L120 120 L0 120 Z" fill="#1D9E75" opacity="0.7"/>
-      <ellipse cx="60" cy="44" rx="12" ry="13" fill="#c8a882"/>
-      <path d="M48 57 Q60 50 72 57 L76 88 Q60 80 44 88 Z" fill="#b8956a"/>
-      <path d="M44 88 Q60 81 76 88 L73 120 L47 120 Z" fill="#a07850"/>
-      <path d="M48 59 Q38 65 35 78 Q38 80 43 78 Q46 67 52 63 Z" fill="#b8956a"/>
-      <path d="M72 59 Q82 65 85 78 Q82 80 77 78 Q74 67 68 63 Z" fill="#b8956a"/>
-    </svg>
+    <img src="logo.jpeg" width="90" height="90" style="border-radius:20px;object-fit:cover;" alt="TUR" />
   </div>
   <div class="login-title" id="loginTitle">TUR</div>
   <p class="login-sub">Registrer besøk og delta i månedlig trekning</p>
@@ -754,7 +742,7 @@
 
 <!-- ===== RESET PASSWORD SCREEN ===== -->
 <div id="resetPasswordScreen" class="screen">
-  <div class="login-logo"></div>
+  <div class="login-logo"><img src="logo.jpeg" width="90" height="90" style="border-radius:20px;object-fit:cover;" alt="TUR" /></div>
   <div class="login-title">Nytt passord</div>
   <p class="login-sub">Velg et nytt passord for kontoen din</p>
   <div class="login-box">
