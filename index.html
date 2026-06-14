@@ -1697,8 +1697,8 @@ let arrowHead = null;   // L.marker رأس السهم
 let _osrmTarget = null, _osrmTimer = null;
 let _hasRoadRoute = false;   // true = road route er tegnet, ikke tegn rett linje
 let _osrmLastFetchPos = null; // آخر موقع تم جلب المسار منه
-const OSRM_DEBOUNCE = 800;
-const OSRM_REFETCH_METERS = 50; // أعد جلب المسار إذا تحرك >50م
+const OSRM_DEBOUNCE = 500;
+const OSRM_REFETCH_METERS = 30; // أعد جلب المسار إذا تحرك >30م
 
 function _clearArrow() {
   if (arrowLine) { leafletMap.removeLayer(arrowLine); arrowLine = null; }
@@ -1783,19 +1783,25 @@ function updateCompass(lat, lng) {
 
   if (!target) { _clearArrow(); _hasRoadRoute = false; _osrmTarget = null; return; }
 
-  // Samme mål — re-fetch bare hvis bruker har gått >50m fra siste rute-start
-  if (_osrmTarget?.order === target.order) {
-    if (!_osrmLastFetchPos) return;
+  const sameTarget = _osrmTarget?.order === target.order;
+
+  // إذا لا يوجد خط مرسوم — ارسم خط مستقيم فوراً (يظهر حتى يأتي OSRM)
+  if (!arrowLine) {
+    _clearArrow();
+    _drawStraightArrow(lat, lng, target, minDist);
+  }
+
+  // نفس الهدف ولم نتحرك كثيراً → الـ animation loop يحرّك بداية الخط
+  if (sameTarget && _osrmLastFetchPos) {
     const moved = haversineMeters(lat, lng, _osrmLastFetchPos[0], _osrmLastFetchPos[1]);
     if (moved < OSRM_REFETCH_METERS) return;
   }
 
-  // Nytt mål eller bruker har beveget seg langt → hent ny rute
+  // هدف جديد أو تحرك كبير → أعد جلب المسار
   _osrmTarget = target;
   _osrmLastFetchPos = [lat, lng];
   clearTimeout(_osrmTimer);
 
-  // Behold gammel rute synlig mens vi venter — ikke slett den ennå
   _osrmTimer = setTimeout(async () => {
     if (_osrmTarget?.order !== target.order) return;
     if (doneCheckpoints.has(target.order)) return;
