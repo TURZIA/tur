@@ -1640,10 +1640,8 @@ function _drawStraightArrow(lat, lng, target, dist) {
   _drawArrowHead(tip, _bearing(lat, lng, target.lat, target.lng));
 }
 
-async function _fetchOsrmRoute(lat, lng, target) {
-  const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/`
-    + `${lng},${lat};${target.lng},${target.lat}`
-    + `?overview=full&geometries=geojson&steps=false`;
+async function _fetchSingleRoute(profileUrl, lng1, lat1, lng2, lat2) {
+  const url = `${profileUrl}${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson&steps=false`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 6000);
   try {
@@ -1651,10 +1649,18 @@ async function _fetchOsrmRoute(lat, lng, target) {
     clearTimeout(t);
     const json = await res.json();
     if (json.code !== 'Ok' || !json.routes?.length) return null;
-    // GeoJSON coords er [lng, lat]
-    const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-    return coords;
+    return { coords: json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]), distance: json.routes[0].distance };
   } catch(e) { clearTimeout(t); return null; }
+}
+
+async function _fetchOsrmRoute(lat, lng, target) {
+  const [foot, car] = await Promise.all([
+    _fetchSingleRoute('https://routing.openstreetmap.de/routed-foot/route/v1/foot/', lng, lat, target.lng, target.lat),
+    _fetchSingleRoute('https://routing.openstreetmap.de/routed-car/route/v1/driving/', lng, lat, target.lng, target.lat),
+  ]);
+  // Pick shortest available route
+  const best = [foot, car].filter(Boolean).sort((a, b) => a.distance - b.distance)[0];
+  return best?.coords || null;
 }
 
 function updateCompass(lat, lng) {
@@ -3236,25 +3242,16 @@ async function _drawRaceRouteInner() {
     }
   } catch(e) {}
 
-  // Fetch each segment separately for accurate per-leg geometry
+  // Fetch each segment using both foot and car — pick shortest
   const segments = [];
   for (let i = 0; i < cps.length - 1; i++) {
     const a = cps[i], b = cps[i + 1];
-    const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/`
-      + `${a.lng},${a.lat};${b.lng},${b.lat}`
-      + `?overview=full&geometries=geojson&steps=false`;
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
-      const res = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(t);
-      const json = await res.json();
-      if (json.code === 'Ok' && json.routes?.[0]?.geometry?.coordinates) {
-        segments.push(json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
-      } else {
-        segments.push(null); // segment failed
-      }
-    } catch(e) { segments.push(null); }
+    const [foot, car] = await Promise.all([
+      _fetchSingleRoute('https://routing.openstreetmap.de/routed-foot/route/v1/foot/', a.lng, a.lat, b.lng, b.lat),
+      _fetchSingleRoute('https://routing.openstreetmap.de/routed-car/route/v1/driving/', a.lng, a.lat, b.lng, b.lat),
+    ]);
+    const best = [foot, car].filter(Boolean).sort((a, b) => a.distance - b.distance)[0];
+    segments.push(best?.coords || null);
   }
 
   if (segments.every(s => s === null)) return; // all failed
