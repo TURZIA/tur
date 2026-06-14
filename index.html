@@ -2222,6 +2222,14 @@ async function handleSendReset() {
   if (!email) { showMsg(msg, 'Skriv inn e-postadressen din', 'amber'); return; }
   document.getElementById('sendResetBtn').disabled = true;
   try {
+    // تحقق من وجود الإيميل في النظام
+    const { data: runner } = await sbClient.from('runners').select('id').eq('email', email).maybeSingle();
+    const { data: admin } = await sbClient.from('admins').select('id').eq('email', email).maybeSingle();
+    const isSuperAdmin = email === CONFIG.ADMIN_EMAIL;
+    if (!runner && !admin && !isSuperAdmin) {
+      showMsg(msg, 'Denne e-postadressen er ikke registrert.', 'red');
+      return;
+    }
     const redirectTo = window.location.origin + window.location.pathname;
     const { error } = await sbClient.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
