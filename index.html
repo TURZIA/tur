@@ -3214,10 +3214,6 @@ async function _loadCpRaceDropdown() {
           if (!confirm('Deaktiver turen for deltakere?')) return;
           await sbClient.from('races').update({ is_current: false }).eq('race_id', raceId);
           if (currentUser) currentUser.raceId = null;
-          CONFIG.CHECKPOINTS = [];
-          rebuildMapMarkers();
-          _clearRaceRoute();
-          _clearArrow();
           showToast('Løpet er deaktivert', 't-warn', 2500);
           await _refreshAllRaceUI();
         };
@@ -3227,18 +3223,22 @@ async function _loadCpRaceDropdown() {
       if (badge) badge.style.display = 'none';
     }
     await renderCpAdminList();
-    // Update map with selected race's checkpoints
-    if (raceId) {
+    // Update map only if this race is the user's active race
+    const isUsersRace = currentUser?.raceId === raceId;
+    if (raceId && isUsersRace) {
       const { data } = await sbClient.from('checkpoints')
         .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
       CONFIG.CHECKPOINTS = (data || []).map(r => ({
         id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
       }));
-    } else {
+      rebuildMapMarkers();
+      drawRaceRoute();
+    } else if (!isUsersRace) {
       CONFIG.CHECKPOINTS = [];
+      rebuildMapMarkers();
+      _clearRaceRoute();
+      _clearArrow();
     }
-    rebuildMapMarkers();
-    drawRaceRoute();
   };
 
   sel.onchange = _updateRaceInfo;
