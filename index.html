@@ -955,6 +955,18 @@
   <div id="statusContent" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
 </div>
 
+<!-- ===== LINK ADMIN POPUP ===== -->
+<div id="linkAdminOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:2000; display:none; align-items:center; justify-content:center; padding:24px;">
+  <div style="background:var(--surface); border-radius:20px; padding:28px 24px; width:100%; max-width:360px; box-shadow:var(--shadow-lg);">
+    <div style="font-size:1.1rem; font-weight:800; margin-bottom:6px;">Koble til arrangør</div>
+    <div style="font-size:0.88rem; color:var(--muted); margin-bottom:20px;">Kontoen din er ikke koblet til noen arrangør. Skriv inn arrangørkoden for å fortsette.</div>
+    <div class="input-label">Arrangørkode</div>
+    <input type="text" id="linkAdminInput" placeholder="F.eks. ABC123" autocorrect="off" autocapitalize="characters" style="margin-bottom:14px;" />
+    <button class="btn btn-green" id="linkAdminBtn">Koble til</button>
+    <div id="linkAdminMsg" style="display:none; margin-top:10px; font-size:0.85rem; text-align:center; padding:8px; border-radius:8px;"></div>
+  </div>
+</div>
+
 <!-- ===== GPS OVERLAY ===== -->
 <div id="gpsOverlay">
   <div class="gps-overlay-icon">📵</div>
@@ -2093,8 +2105,14 @@ async function onAuthSuccess(user, nameOverride) {
   document.getElementById('historikkBtn').style.display  = isSuperAdmin ? 'none' : '';
   document.getElementById('statusBtn').style.display     = isSuperAdmin ? '' : 'none';
 
+  // Runner with no admin link — show popup before entering main screen
+  if (!isSuperAdmin && !isAdmin && !runnerAdminCode) {
+    startMainScreen(currentUser);
+    setTimeout(() => showLinkAdminPopup(), 400);
+    return;
+  }
+
   await loadCheckpointsFromSupabase(adminCode);
-  // Warn runner if no active race yet
   if (!isSuperAdmin && !isAdmin && !currentUser?.raceId) {
     setTimeout(() => showToast('Arrangøren har ikke aktivert noe løp ennå', 't-warn', 5000), 1500);
   }
@@ -3093,6 +3111,8 @@ async function init() {
   // Drawer
   document.getElementById('historikkBtn').addEventListener('click', openDrawer);
   document.getElementById('statusBtn').addEventListener('click', openStatusDrawer);
+  document.getElementById('linkAdminBtn').addEventListener('click', handleLinkAdmin);
+  document.getElementById('linkAdminInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleLinkAdmin(); });
   document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
 
@@ -3163,6 +3183,51 @@ async function init() {
       showScreen('loginScreen');
     }
   });
+}
+
+function showLinkAdminPopup() {
+  const overlay = document.getElementById('linkAdminOverlay');
+  overlay.style.display = 'flex';
+  document.getElementById('linkAdminInput').value = '';
+  document.getElementById('linkAdminMsg').style.display = 'none';
+  setTimeout(() => document.getElementById('linkAdminInput').focus(), 200);
+}
+
+async function handleLinkAdmin() {
+  const code = (document.getElementById('linkAdminInput').value || '').trim().toUpperCase();
+  const msg  = document.getElementById('linkAdminMsg');
+  const btn  = document.getElementById('linkAdminBtn');
+  if (!code) { showLinkAdminMsg('Skriv inn koden', 'var(--amber)'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', code).eq('is_active', true).single();
+  if (!adminRow) {
+    showLinkAdminMsg('Ugyldig kode — sjekk med arrangøren', 'var(--red)');
+    btn.disabled = false; btn.textContent = 'Koble til';
+    return;
+  }
+
+  await saveRunnerToSupabase(currentUser.id, currentUser.name, code);
+  currentUser.adminCode = code;
+  document.getElementById('linkAdminOverlay').style.display = 'none';
+
+  await loadCheckpointsFromSupabase(code);
+  rebuildMapMarkers();
+  drawRaceRoute();
+  if (!currentUser.raceId) showToast('Arrangøren har ikke aktivert noe løp ennå', 't-warn', 5000);
+  else showToast('Koblet til arrangør!', 't-success', 2500);
+
+  btn.disabled = false; btn.textContent = 'Koble til';
+}
+
+function showLinkAdminMsg(text, color) {
+  const el = document.getElementById('linkAdminMsg');
+  el.textContent = text;
+  el.style.background = color === 'var(--red)' ? 'rgba(239,68,68,0.1)' : 'rgba(201,168,0,0.1)';
+  el.style.color = color;
+  el.style.display = 'block';
 }
 
 function closeStatusDrawer() {
