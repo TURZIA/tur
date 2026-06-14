@@ -1653,14 +1653,25 @@ async function _fetchSingleRoute(profileUrl, lng1, lat1, lng2, lat2) {
   } catch(e) { clearTimeout(t); return null; }
 }
 
-async function _fetchOsrmRoute(lat, lng, target) {
-  const [foot, car] = await Promise.all([
-    _fetchSingleRoute('https://routing.openstreetmap.de/routed-foot/route/v1/foot/', lng, lat, target.lng, target.lat),
-    _fetchSingleRoute('https://routing.openstreetmap.de/routed-car/route/v1/driving/', lng, lat, target.lng, target.lat),
+async function _fetchOsrmRoute(lat, lng, target, onFirstResult) {
+  let bestDistance = Infinity;
+  let bestCoords   = null;
+
+  const tryRoute = async (profileUrl) => {
+    const result = await _fetchSingleRoute(profileUrl, lng, lat, target.lng, target.lat);
+    if (!result) return;
+    if (result.distance < bestDistance) {
+      bestDistance = result.distance;
+      bestCoords   = result.coords;
+      if (onFirstResult) onFirstResult(bestCoords); // draw immediately
+    }
+  };
+
+  await Promise.all([
+    tryRoute('https://routing.openstreetmap.de/routed-foot/route/v1/foot/'),
+    tryRoute('https://routing.openstreetmap.de/routed-car/route/v1/driving/'),
   ]);
-  // Pick shortest available route
-  const best = [foot, car].filter(Boolean).sort((a, b) => a.distance - b.distance)[0];
-  return best?.coords || null;
+  return bestCoords;
 }
 
 function updateCompass(lat, lng) {
@@ -1689,27 +1700,22 @@ function updateCompass(lat, lng) {
   // Behold gammel rute synlig mens vi venter — ikke slett den ennå
   _osrmTimer = setTimeout(async () => {
     if (_osrmTarget?.order !== target.order) return;
-
-    const capturedLat = lat, capturedLng = lng, capturedDist = minDist;
-    const coords = await _fetchOsrmRoute(capturedLat, capturedLng, target);
-
-    if (_osrmTarget?.order !== target.order) return;
-
-    // Sjekk at målet ikke ble registrert mens vi ventet
     if (doneCheckpoints.has(target.order)) return;
 
-    // Nå er vi klare til å tegne — slett gammelt
-    _clearArrow();
-
-    if (coords && coords.length >= 2) {
+    const drawRoute = (coords) => {
+      if (_osrmTarget?.order !== target.order) return;
+      if (doneCheckpoints.has(target.order)) return;
+      if (!coords || coords.length < 2) return;
+      _clearArrow();
       arrowLine = L.polyline(coords, {
         color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
       }).addTo(leafletMap);
       const n = coords.length;
       _drawArrowHead(coords[n-1], _bearing(coords[n-2][0], coords[n-2][1], coords[n-1][0], coords[n-1][1]));
       _hasRoadRoute = true;
-    }
-    // OSRM failed — draw nothing, keep retrying on next GPS update
+    };
+
+    await _fetchOsrmRoute(lat, lng, target, drawRoute);
   }, OSRM_DEBOUNCE);
 }
 
