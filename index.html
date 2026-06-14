@@ -14,10 +14,10 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Løypesjekk" />
-  <meta name="description" content="GPS-sjekkpunkt registrering for fjellløp" />
+  <meta name="apple-mobile-web-app-title" content="TUR" />
+  <meta name="description" content="Registrer besøk ved tursteder og delta i månedlig trekning" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='sky' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231a3a5c'/%3E%3Cstop offset='1' stop-color='%232d6a8f'/%3E%3C/linearGradient%3E%3ClinearGradient id='sea' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%231D9E75'/%3E%3Cstop offset='1' stop-color='%230d6b50'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' rx='28' fill='url(%23sky)'/%3E%3Crect y='110' width='180' height='70' rx='0' fill='url(%23sea)'/%3E%3Cpath d='M10 115 Q45 100 90 108 Q135 116 170 108 L170 180 L10 180 Z' fill='%231D9E75' opacity='0.7'/%3E%3Cpath d='M10 122 Q50 112 90 118 Q130 124 170 115 L170 180 L10 180 Z' fill='%230d6b50' opacity='0.5'/%3E%3Cellipse cx='90' cy='68' rx='16' ry='18' fill='%23c8a882'/%3E%3Cpath d='M74 86 Q90 78 106 86 L112 130 Q90 120 68 130 Z' fill='%23b8956a'/%3E%3Cpath d='M68 130 Q90 122 112 130 L108 180 L72 180 Z' fill='%23a07850'/%3E%3Cpath d='M74 88 Q60 95 55 115 Q58 118 65 115 Q70 100 78 95 Z' fill='%23b8956a'/%3E%3Cpath d='M106 88 Q120 95 125 115 Q122 118 115 115 Q110 100 102 95 Z' fill='%23b8956a'/%3E%3Cellipse cx='84' cy='66' rx='5' ry='5' fill='%23333'/%3E%3Cellipse cx='96' cy='66' rx='5' ry='5' fill='%23333'/%3E%3C/svg%3E" />
-  <title>Løypesjekk</title>
+  <title>TUR</title>
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -655,8 +655,8 @@
       <path d="M72 59 Q82 65 85 78 Q82 80 77 78 Q74 67 68 63 Z" fill="#b8956a"/>
     </svg>
   </div>
-  <div class="login-title" id="loginTitle">Løypesjekk</div>
-  <p class="login-sub">Registrer GPS-posisjon ved sjekkpunkt</p>
+  <div class="login-title" id="loginTitle">TUR</div>
+  <p class="login-sub">Registrer besøk og delta i månedlig trekning</p>
 
   <!-- فورم تسجيل الدخول -->
   <div class="login-box" id="signinBox">
@@ -717,7 +717,7 @@
              autocomplete="new-password" />
     </div>
     <div id="signupCodeDiv">
-      <div class="input-label">Arrangørkode (får du av arrangøren)</div>
+      <div class="input-label">Deltakerkode (får du av arrangøren)</div>
       <input type="text" id="signupRaceCode" placeholder="Skriv inn koden"
              autocomplete="off" autocorrect="off" autocapitalize="characters" />
     </div>
@@ -755,7 +755,7 @@
   <header class="app-header">
     <div class="header-row1">
       <div class="header-left">
-        <span class="race-name" id="headerRaceName">Løypesjekk</span>
+        <span class="race-name" id="headerRaceName">TUR</span>
       </div>
       <div class="runner-info">
         <span class="runner-name-display" id="headerRunnerName"></span>
@@ -767,7 +767,7 @@
       <button class="historikk-btn" id="statusBtn" style="display:none;">Status</button>
       <button class="historikk-btn" id="rapportBtn" style="display:none;">Rapport</button>
       <button class="historikk-btn" id="cpAdminBtn" style="display:none;">Sjekkpunkter</button>
-      <button class="historikk-btn" id="løpereBtn" style="display:none;">Løpere</button>
+      <button class="historikk-btn" id="løpereBtn" style="display:none;">Deltakere</button>
       <button class="historikk-btn" id="superAdminBtn" style="display:none;">Admins</button>
     </div>
   </header>
@@ -782,7 +782,7 @@
     <div id="map"></div>
 
     <!-- COMPASS -->
-    <div id="compassWidget" title="Peker mot nærmeste sjekkpunkt">
+    <div id="compassWidget" title="Peker mot nærmeste sted">
       <svg id="compassArrow" viewBox="0 0 40 40" width="36" height="36">
         <polygon points="20,4 26,32 20,27 14,32" fill="#FF6B6B" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
         <circle cx="20" cy="20" r="3" fill="white" opacity="0.8"/>
@@ -790,11 +790,11 @@
     </div>
 
 <div class="map-legend">
-      <div class="legend-row"><div class="legend-dot" style="background:#0EA371;border:2px solid #fff;box-shadow:0 0 0 1px #0EA371"></div> Sjekkpunkt</div>
-      <div class="legend-row"><div class="legend-dot" style="background:#EF4444;border:2px solid #fff;box-shadow:0 0 0 1px #EF4444"></div> Registrert</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#0EA371;border:2px solid #fff;box-shadow:0 0 0 1px #0EA371"></div> Sted</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#EF4444;border:2px solid #fff;box-shadow:0 0 0 1px #EF4444"></div> Besøkt</div>
       <div class="legend-row"><div class="legend-dot" style="background:#3B82F6;border:2px solid #fff;box-shadow:0 0 0 1px #3B82F6"></div> Din posisjon</div>
-      <div class="legend-row"><div style="width:20px;height:3px;background:#C9A800;border-radius:2px"></div> Løpsrute</div>
-      <div class="legend-row" id="legendNextCp"><div style="width:20px;height:3px;background:#FF6B6B;border-radius:2px"></div> Neste sjekkpunkt</div>
+      <div class="legend-row"><div style="width:20px;height:3px;background:#C9A800;border-radius:2px"></div> Turrute</div>
+      <div class="legend-row" id="legendNextCp"><div style="width:20px;height:3px;background:#FF6B6B;border-radius:2px"></div> Neste sted</div>
     </div>
   </div>
 
@@ -828,22 +828,22 @@
   <div class="rapport-header">
     <button class="rapport-back" id="cpAdminBackBtn">← Tilbake</button>
     <span class="rapport-title">Sjekkpunkter</span>
-    <button id="cpNewRaceHeaderBtn" style="margin-left:auto; background:var(--green); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:0.85rem; font-weight:600; cursor:pointer;">+ Nytt løp</button>
+    <button id="cpNewRaceHeaderBtn" style="margin-left:auto; background:var(--green); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:0.85rem; font-weight:600; cursor:pointer;">+ Ny tur</button>
   </div>
   <div class="rapport-body">
 
     <!-- dropdown السباقات -->
     <div class="rapport-card">
-      <div class="rapport-card-title">Velg løp</div>
+      <div class="rapport-card-title">Velg tur</div>
       <select id="cpRaceSelect" class="form-select">
-        <option value="">-- Velg et løp --</option>
+        <option value="">-- Velg en tur --</option>
       </select>
       <!-- race actions -->
       <div id="cpRaceInfo" style="display:none; margin-top:12px; display:flex; gap:8px;">
         <button id="cpActivateRaceBtn" style="flex:1; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver</button>
         <button id="cpDeactivateRaceBtn" style="flex:1; background:none; border:1px solid var(--muted); border-radius:8px; padding:8px 14px; font-size:0.88rem; color:var(--muted); cursor:pointer;">✗ Deaktiver</button>
       </div>
-      <div id="cpRaceActiveBadge" style="display:none; margin-top:8px; font-size:0.8rem; color:var(--green-dk); font-weight:600;">● Aktivt løp for løpere</div>
+      <div id="cpRaceActiveBadge" style="display:none; margin-top:8px; font-size:0.8rem; color:var(--green-dk); font-weight:600;">● Aktiv tur for deltakere</div>
     </div>
 
     <!-- نقاط السباق المختار -->
@@ -856,16 +856,16 @@
 <div id="løpereScreen" class="screen">
   <div class="rapport-header">
     <button class="rapport-back" id="løpereBackBtn">← Tilbake</button>
-    <span class="rapport-title">Løpere</span>
+    <span class="rapport-title">Deltakere</span>
   </div>
   <div class="rapport-body">
 
     <div class="rapport-card">
       <div id="løpereCount" style="font-size:1.1rem; font-weight:700; margin-bottom:16px;">0 deltakere</div>
       <!-- Add runner by email -->
-      <div class="input-label">Legg til løper via e-post</div>
+      <div class="input-label">Legg til deltaker via e-post</div>
       <div style="display:flex; gap:8px; margin-top:4px;">
-        <input type="email" id="løpereAddEmail" placeholder="løper@epost.no" autocorrect="off" autocapitalize="off" style="flex:1;" />
+        <input type="email" id="løpereAddEmail" placeholder="deltaker@epost.no" autocorrect="off" autocapitalize="off" style="flex:1;" />
         <button id="løpereAddBtn" style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.88rem;font-weight:600;cursor:pointer;white-space:nowrap;">+ Legg til</button>
       </div>
       <div id="løpereAddMsg" style="display:none; font-size:0.82rem; margin-top:6px;"></div>
@@ -880,19 +880,19 @@
 <div id="cpNewRaceScreen" class="screen">
   <div class="rapport-header">
     <button class="rapport-back" id="cpNewRaceBackBtn">← Tilbake</button>
-    <span class="rapport-title">Administrer løp</span>
+    <span class="rapport-title">Administrer turer</span>
   </div>
   <div class="rapport-body">
 
     <!-- إنشاء سباق جديد -->
     <div class="rapport-card" id="cpNRCreateCard">
-      <div class="rapport-card-title">Nytt løp</div>
+      <div class="rapport-card-title">Ny tur</div>
       <input type="text" id="cpNRName" placeholder="f.eks. Oslo Maraton" autocorrect="off" />
       <div id="cpNRAdminCodeWrap" style="display:none; margin-top:10px;">
         <div class="input-label">Arrangørkode (hvilken admin)</div>
         <input type="text" id="cpNRAdminCode" placeholder="F.eks. ABC123" autocorrect="off" autocapitalize="characters" maxlength="6" />
       </div>
-      <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">+ Opprett løp</button>
+      <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">+ Opprett tur</button>
     </div>
 
     <!-- قائمة كل السباقات مع نقاطها -->
@@ -921,11 +921,11 @@
       </select>
     </div>
 
-    <!-- Velg løp -->
+    <!-- Velg tur -->
     <div class="rapport-card" id="rapportRaceCard" style="display:none;">
-      <div class="rapport-card-title">Velg løp</div>
+      <div class="rapport-card-title">Velg tur</div>
       <select id="rapportRaceSelect" class="form-select">
-        <option value="">-- Alle løp --</option>
+        <option value="">-- Alle turer --</option>
       </select>
     </div>
 
@@ -959,10 +959,10 @@
     <button class="drawer-close" id="drawerCloseBtn">✕</button>
   </div>
   <div class="drawer-runner-info">
-    <div>Løper: <strong id="drawerRunnerName">—</strong></div>
+    <div>Deltaker: <strong id="drawerRunnerName">—</strong></div>
     <div id="drawerAdminCode" style="display:none; margin-top:4px; font-size:0.85rem; color:var(--muted);">Kode: <strong id="drawerAdminCodeValue" style="color:var(--text); letter-spacing:0.08em;"></strong></div>
     <div id="drawerTotalCount" style="margin-top:2px"></div>
-    <button id="byttArrangorBtn" style="display:none; margin-top:10px; background:none; border:1px solid var(--muted); border-radius:8px; padding:6px 14px; font-size:0.82rem; color:var(--muted); cursor:pointer;">Endre arrangørkode</button>
+    <button id="byttArrangorBtn" style="display:none; margin-top:10px; background:none; border:1px solid var(--muted); border-radius:8px; padding:6px 14px; font-size:0.82rem; color:var(--muted); cursor:pointer;">Bytt arrangør</button>
   </div>
   <div class="drawer-body" id="drawerBody">
     <div class="drawer-loading">Laster…</div>
@@ -983,8 +983,8 @@
 <div id="linkAdminOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:2000; display:none; align-items:center; justify-content:center; padding:24px;">
   <div style="background:var(--surface); border-radius:20px; padding:28px 24px; width:100%; max-width:360px; box-shadow:var(--shadow-lg);">
     <div style="font-size:1.1rem; font-weight:800; margin-bottom:6px;">Koble til arrangør</div>
-    <div style="font-size:0.88rem; color:var(--muted); margin-bottom:20px;">Kontoen din er ikke koblet til noen arrangør. Skriv inn arrangørkoden for å fortsette.</div>
-    <div class="input-label">Arrangørkode</div>
+    <div style="font-size:0.88rem; color:var(--muted); margin-bottom:20px;">Kontoen din er ikke koblet til noen arrangør. Skriv inn deltakerkoden du fikk fra arrangøren.</div>
+    <div class="input-label">Deltakerkode</div>
     <input type="text" id="linkAdminInput" placeholder="F.eks. ABC123" autocorrect="off" autocapitalize="characters" style="margin-bottom:14px;" />
     <button class="btn btn-green" id="linkAdminBtn">Koble til</button>
     <div id="linkAdminMsg" style="display:none; margin-top:10px; font-size:0.85rem; text-align:center; padding:8px; border-radius:8px;"></div>
@@ -996,7 +996,7 @@
   <div class="gps-overlay-icon">📵</div>
   <div class="gps-overlay-title">GPS-tilgang er blokkert</div>
   <div class="gps-overlay-body">
-    Appen trenger tilgang til posisjonen din for å registrere sjekkpunktet.
+    Appen trenger tilgang til posisjonen din for å registrere besøket.
   </div>
   <div class="gps-instructions" id="gpsInstructions">
     <strong>Slik aktiverer du posisjon på iPhone:</strong><br>
@@ -1033,7 +1033,7 @@ const CONFIG = {
   EMAILJS_TEMPLATE:  'template_64ke7fc',
   EMAILJS_PUBLIC_KEY:'VrIDl9-cEJGl6LTAY',
 
-  RACE_NAME: 'Toppløpet',
+  RACE_NAME: 'TUR',
   RACE_ID:   'topploepet-2025',
 
   // سett true عند يوم السباق بعد تحديد الإحداثيات الحقيقية
@@ -1098,7 +1098,7 @@ function loadTrack() {
 function injectManifest() {
   try {
     const manifest = {
-      name: CONFIG.RACE_NAME, short_name: 'Løypesjekk',
+      name: CONFIG.RACE_NAME, short_name: 'TUR',
       start_url: './', display: 'standalone',
       background_color: '#FAFAF8', theme_color: '#1D9E75',
       icons: [{
@@ -1478,7 +1478,7 @@ function updateRegisterButton(lat, lng) {
   if (CONFIG.CHECKPOINTS.length === 0) {
     stopPulse();
     btn.className = 'btn btn-gray';
-    btn.textContent = 'Ingen sjekkpunkter tilgjengelig';
+    btn.textContent = 'Ingen steder tilgjengelig';
     return;
   }
 
@@ -1926,7 +1926,7 @@ async function loadDrawerHistory() {
     header.innerHTML = `
       <div>
         <div style="font-weight:700; font-size:0.95rem;">🏆 ${raceName}</div>
-        <div style="font-size:0.78rem; color:var(--muted); margin-top:2px;">${firstDate} · ${entries.length} sjekkpunkt${entries.length !== 1 ? 'er' : ''}</div>
+        <div style="font-size:0.78rem; color:var(--muted); margin-top:2px;">${firstDate} · ${entries.length} sted${entries.length !== 1 ? 'er' : ''}</div>
       </div>
       <span style="font-size:1rem; color:var(--muted);">▼</span>`;
 
@@ -2002,7 +2002,7 @@ async function registerPosition() {
     }
 
     if (!currentUser?.raceId) {
-      showToast('Ingen aktiv løp — kontakt arrangøren', 't-warn', 4000);
+      showToast('Ingen aktiv tur — kontakt arrangøren', 't-warn', 4000);
       return;
     }
 
@@ -2058,7 +2058,7 @@ async function registerPosition() {
     // Check if all checkpoints are now done
     const allOrders = CONFIG.CHECKPOINTS.map(cp => cp.order);
     if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
-      setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1500);
+      setTimeout(() => showToast('Gratulerer! Du har besøkt alle steder denne måneden! 🎉', 't-success', 8000), 1500);
       setTimeout(() => {
         doneCheckpoints.clear();
         rebuildMapMarkers();
@@ -2193,7 +2193,7 @@ async function handleSignup() {
     if (!adminCode) { showToast('Skriv inn arrangørkoden', 't-warn'); return; }
     const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).eq('is_active', true).single();
     if (!adminRow) {
-      showToast('Ugyldig arrangørkode — sjekk med arrangøren', 't-error', 5000);
+      showToast('Ugyldig deltakerkode — sjekk med arrangøren', 't-error', 5000);
       return;
     }
   }
@@ -2292,7 +2292,7 @@ async function onAuthSuccess(user, nameOverride) {
 
   await loadCheckpointsFromSupabase(adminCode);
   if (!isSuperAdmin && !isAdmin && !currentUser?.raceId) {
-    setTimeout(() => showToast('Arrangøren har ikke aktivert noe løp ennå', 't-warn', 5000), 1500);
+    setTimeout(() => showToast('Arrangøren har ikke aktivert noen tur ennå', 't-warn', 5000), 1500);
   }
   startMainScreen(currentUser);
 }
@@ -2399,7 +2399,7 @@ function startRealtime(runner) {
       rebuildMapMarkers();
       if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
       drawRaceRoute();
-      showToast('Arrangøren har aktivert et nytt løp', 't-success', 3000);
+      showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
     });
   }
 
@@ -2546,7 +2546,7 @@ function buildLeaderboard(data) {
   const el = document.getElementById('leaderboard');
   el.innerHTML = `
     <div class="lb-title">Resultater</div>
-    <div class="lb-sub">${list.length} deltakere — ${total} sjekkpunkter totalt</div>
+    <div class="lb-sub">${list.length} deltakere — ${total} steder totalt</div>
     <table class="lb-table">
       <thead><tr>
         <th>#</th><th>Navn</th><th>Sjekkpunkter</th><th>Total tid</th>
@@ -2606,8 +2606,8 @@ async function fetchRapportData() {
 function buildWorkbook(data) {
   const rows = data.map(r => ({
     'Navn':                   r.runner_name      || '',
-    'Sjekkpunkt nr':          r.checkpoint_order || '',
-    'Sjekkpunkt navn':        r.checkpoint_name  || '',
+    'Sted nr':                r.checkpoint_order || '',
+    'Sted navn':              r.checkpoint_name  || '',
     'Dato':                   new Date(r.timestamp).toLocaleDateString('nb-NO'),
     'Klokkeslett':            new Date(r.timestamp).toLocaleTimeString('nb-NO'),
     'Tid fra forrige (sek)':  r.elapsed_seconds  ?? '',
@@ -2647,7 +2647,7 @@ async function sendRapportEmail() {
     const fileName = `Rapport_${fraStr.replace(/\./g,'-')}_til_${tilStr.replace(/\./g,'-')}.xlsx`;
 
     // بناء جدول HTML للإيميل
-    const header = ['Navn','Sjekkpunkt nr','Sjekkpunkt navn','Dato','Klokkeslett','Tid fra forrige (sek)'];
+    const header = ['Navn','Sted nr','Sted navn','Dato','Klokkeslett','Tid fra forrige (sek)'];
     const tableRows = data.map(r => `
       <tr>
         <td>${escHtml(r.runner_name||'')}</td>
@@ -2707,7 +2707,7 @@ async function openRapportScreen() {
   const raceSel    = document.getElementById('rapportRaceSelect');
 
   const _loadRacesForAdmin = async (adminCode) => {
-    raceSel.innerHTML = '<option value="">-- Alle løp --</option>';
+    raceSel.innerHTML = '<option value="">-- Alle turer --</option>';
     if (!adminCode) { raceCard.style.display = 'none'; return; }
     const { data } = await sbClient.from('races').select('race_id,name').eq('admin_code', adminCode).eq('is_active', true).order('created_at');
     (data || []).forEach(r => {
@@ -2907,14 +2907,14 @@ async function loadLøpereList() {
   const countEl = document.getElementById('løpereCount');
   if (!currentUser?.adminCode) {
     countEl.textContent = '0 deltakere';
-    list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Ingen løpere koblet til deg ennå.</div>';
+    list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Ingen deltakere koblet til deg ennå.</div>';
     return;
   }
   list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Laster…</div>';
   const { data, error } = await sbClient.from('runners').select('id,name,email').eq('race_id', currentUser.adminCode).order('name');
   if (error || !data || data.length === 0) {
     countEl.textContent = '0 deltakere';
-    list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Ingen løpere koblet til deg ennå.</div>';
+    list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Ingen deltakere koblet til deg ennå.</div>';
     return;
   }
   countEl.textContent = `${data.length} deltaker${data.length !== 1 ? 'e' : ''}`;
@@ -2929,7 +2929,7 @@ async function loadLøpereList() {
 }
 
 async function removeRunner(runnerId) {
-  if (!confirm('Fjerne denne løperen fra listen?')) return;
+  if (!confirm('Fjerne denne deltakeren fra listen?')) return;
   await sbClient.from('runners').update({ race_id: null }).eq('id', runnerId);
   await loadLøpereList();
 }
@@ -2971,7 +2971,7 @@ async function _loadCpRaceDropdown() {
   const { data: races } = await query;
 
   const prev = sel.value;
-  sel.innerHTML = '<option value="">-- Velg løp --</option>';
+  sel.innerHTML = '<option value="">-- Velg tur --</option>';
   (races || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.race_id;
@@ -2992,7 +2992,7 @@ async function _loadCpRaceDropdown() {
       const deactivateBtn = document.getElementById('cpDeactivateRaceBtn');
       const { data: r } = await sbClient.from('races').select('is_current').eq('race_id', raceId).single();
       const isActive = !!r?.is_current;
-      if (badge) { badge.style.display = isActive ? '' : 'none'; badge.textContent = '● Aktivt løp for løpere'; }
+      if (badge) { badge.style.display = isActive ? '' : 'none'; badge.textContent = '● Aktiv tur for deltakere'; }
       if (activateBtn) {
         activateBtn.disabled = isActive;
         activateBtn.style.opacity = isActive ? '0.4' : '1';
@@ -3005,7 +3005,7 @@ async function _loadCpRaceDropdown() {
         deactivateBtn.disabled = !isActive;
         deactivateBtn.style.opacity = !isActive ? '0.4' : '1';
         deactivateBtn.onclick = async () => {
-          if (!confirm('Deaktiver løpet for løpere?')) return;
+          if (!confirm('Deaktiver turen for deltakere?')) return;
           await sbClient.from('races').update({ is_current: false }).eq('race_id', raceId);
           if (currentUser) currentUser.raceId = null;
           showToast('Løpet er deaktivert', 't-warn', 2500);
@@ -3057,7 +3057,7 @@ async function renderNRRacesList() {
   let query = sbClient.from('races').select('race_id,name,is_current,admin_code').eq('is_active', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', adminCode);
   const { data: races } = await query;
-  if (!races || races.length === 0) { container.innerHTML = '<div class="list-empty">Ingen løp funnet.</div>'; return; }
+  if (!races || races.length === 0) { container.innerHTML = '<div class="list-empty">Ingen turer funnet.</div>'; return; }
 
   // Fetch admin emails for super admin view
   let adminEmails = {};
@@ -3095,14 +3095,14 @@ async function renderNRRacesList() {
     const addForm = document.createElement('div');
     addForm.style.cssText = 'padding:12px 14px; border-top:1px solid var(--border); background:var(--bg);';
     addForm.innerHTML = `
-      <div class="rapport-card-title" style="margin-bottom:8px;">Legg til sjekkpunkt</div>
+      <div class="rapport-card-title" style="margin-bottom:8px;">Legg til sted</div>
       <div class="input-label">Navn</div>
       <input type="text" id="nrName_${escHtml(race.race_id)}" placeholder="f.eks. Toppen" autocorrect="off" style="margin-bottom:8px;" />
       <div class="input-label">Koordinater</div>
       <input type="text" id="nrCoords_${escHtml(race.race_id)}" placeholder="59.9510 10.7732" autocorrect="off" autocapitalize="off" inputmode="decimal" style="margin-bottom:10px;" />
       <button class="btn btn-green" style="padding:8px 0;" onclick="addCpToRace('${escHtml(race.race_id)}')">+ Legg til</button>
-      ${!isSuperAdmin ? `<button onclick="activateRaceNR('${escHtml(race.race_id)}')" style="width:100%;margin-top:10px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-size:0.88rem;font-weight:600;cursor:pointer;">✓ Aktiver for løpere</button>` : ''}
-      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;margin-top:8px;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett løp</button>`;
+      ${!isSuperAdmin ? `<button onclick="activateRaceNR('${escHtml(race.race_id)}')" style="width:100%;margin-top:10px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-size:0.88rem;font-weight:600;cursor:pointer;">✓ Aktiver for deltakere</button>` : ''}
+      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;margin-top:8px;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett tur</button>`;
 
     body.appendChild(cpList);
     body.appendChild(addForm);
@@ -3176,7 +3176,7 @@ async function addCpToRace(raceId) {
 
 async function createRace() {
   const name = document.getElementById('cpNRName').value.trim();
-  if (!name) { showToast('Skriv inn et løpsnavn', 't-warn'); return; }
+  if (!name) { showToast('Skriv inn et turnavn', 't-warn'); return; }
 
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   let adminCode = currentUser?.adminCode;
@@ -3205,7 +3205,7 @@ async function createRace() {
   document.getElementById('cpNRName').value    = '';
   document.getElementById('cpNRName').disabled = false;
   if (document.getElementById('cpNRAdminCode')) document.getElementById('cpNRAdminCode').value = '';
-  btn.disabled = false; btn.textContent = '+ Opprett løp';
+  btn.disabled = false; btn.textContent = '+ Opprett tur';
   showToast(`"${name}" opprettet!`, 't-success', 2000);
   await renderNRRacesList();
 }
@@ -3215,7 +3215,7 @@ async function activateRace(raceId, adminCode) {
   await sbClient.from('races').update({ is_current: false }).eq('admin_code', adminCode);
   await sbClient.from('races').update({ is_current: true  }).eq('race_id', raceId);
   if (currentUser) currentUser.raceId = raceId;
-  showToast('Løpet er aktivert for alle løpere', 't-success', 2500);
+  showToast('Turen er aktivert for alle deltakere', 't-success', 2500);
 }
 
 async function activateRaceNR(raceId) {
@@ -3226,7 +3226,7 @@ async function activateRaceNR(raceId) {
 }
 
 async function deleteRace(raceId) {
-  if (!confirm('Slett dette løpet og alle sjekkpunktene?')) return;
+  if (!confirm('Slett denne turen og alle stedene?')) return;
   await sbClient.from('checkpoints').delete().eq('race_id', raceId);
   await sbClient.from('races').update({ is_active: false, is_current: false }).eq('race_id', raceId);
   await renderNRRacesList();
@@ -3580,7 +3580,7 @@ async function handleLinkAdmin() {
 
   const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', code).eq('is_active', true).single();
   if (!adminRow) {
-    showLinkAdminMsg('Ugyldig kode — sjekk med arrangøren', 'var(--red)');
+    showLinkAdminMsg('Ugyldig deltakerkode — sjekk med arrangøren', 'var(--red)');
     btn.disabled = false; btn.textContent = 'Koble til';
     return;
   }
@@ -3640,7 +3640,7 @@ async function openStatusDrawer() {
   el.innerHTML =
     card('Sjekkpunkter', cpCount, '#0EA371') +
     card('Admins',       admCount, '#3B82F6') +
-    card('Løpere',       rnCount,  '#8B5CF6') +
+    card('Deltakere',    rnCount,  '#8B5CF6') +
     card('Løp (aktive)', rcCount,  '#C9A800');
 }
 
