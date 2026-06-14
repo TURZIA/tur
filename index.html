@@ -1166,7 +1166,7 @@ async function fetchLastCheckIn(runnerId) {
   } catch { return null; }
 }
 
-// تجلب كل تسجيلات الراكض من Supabase
+// تجلب تسجيلات الراكض للسباق الحالي فقط (للخريطة)
 async function fetchRunnerHistory(runnerId) {
   if (!sbClient) return [];
   try {
@@ -1175,10 +1175,24 @@ async function fetchRunnerHistory(runnerId) {
       .select('checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, timestamp, elapsed_seconds, race_id')
       .eq('runner_id', runnerId)
       .eq('race_id', currentUser?.raceId || '')
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: true });
     if (error) throw error;
     return data || [];
   } catch(e) { console.warn('fetchHistory:', e); return []; }
+}
+
+// تجلب كل تسجيلات الراكض من جميع السباقات (للدرج)
+async function fetchAllRunnerHistory(runnerId) {
+  if (!sbClient) return [];
+  try {
+    const { data, error } = await sbClient
+      .from('check_ins')
+      .select('checkpoint_name, checkpoint_order, accuracy_meters, timestamp, elapsed_seconds, race_id')
+      .eq('runner_id', runnerId)
+      .order('timestamp', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch(e) { console.warn('fetchAllHistory:', e); return []; }
 }
 
 /* ============================================================
@@ -1441,37 +1455,19 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
   const doneOrders = Object.keys(latestByOrder).map(Number);
   const allDone    = totalCps > 0 && allOrders.every(o => doneOrders.includes(o));
 
-  const raceCompletedKey = `race_done_${currentUser?.id}_${currentUser?.raceId}`;
-  const alreadyAcknowledged = localStorage.getItem(raceCompletedKey) === '1';
-
-  if (allDone && alreadyAcknowledged) {
-    // Already celebrated — show everything green (fresh start)
+  if (allDone) {
+    // Race already completed — show fresh green start, no red markers
     return;
   }
 
+  // Mark only today's check-ins as done; previous days reset to green
   Object.entries(latestByOrder).forEach(([order, entry]) => {
     const doneToday = new Date(entry.timestamp).toDateString() === today;
-    if (!allDone && doneToday) {
+    if (doneToday) {
       markCheckpointDone(Number(order), entry.race_id);
       doneCheckpoints.add(Number(order));
     }
-    // allDone handled below; previous day + incomplete → green
   });
-
-  if (allDone && !alreadyAcknowledged) {
-    // First time seeing completion — celebrate then reset
-    Object.entries(latestByOrder).forEach(([order, entry]) => {
-      markCheckpointDone(Number(order), entry.race_id);
-      doneCheckpoints.add(Number(order));
-    });
-    setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1000);
-    setTimeout(() => {
-      localStorage.setItem(raceCompletedKey, '1');
-      doneCheckpoints.clear();
-      rebuildMapMarkers();
-      if (positionMarker) { const ll = positionMarker.getLatLng(); updateRegisterButton(ll.lat, ll.lng); }
-    }, 10000);
-  }
 }
 
 /* ============================================================
@@ -1876,7 +1872,7 @@ async function loadDrawerHistory() {
   byttBtn.style.display = (!isAdminUser && runner.email !== CONFIG.ADMIN_EMAIL) ? '' : 'none';
   document.getElementById('drawerBody').innerHTML = '<div class="drawer-loading">Laster historikk…</div>';
 
-  const history = await fetchRunnerHistory(runner.id);
+  const history = await fetchAllRunnerHistory(runner.id);
 
   if (history.length === 0) {
     document.getElementById('drawerBody').innerHTML = '<div class="drawer-empty">Ingen registreringer ennå</div>';
@@ -1884,29 +1880,68 @@ async function loadDrawerHistory() {
     return;
   }
 
+  // Group by race_id
+  const byRace = {};
+  history.forEach(e => {
+    if (!byRace[e.race_id]) byRace[e.race_id] = [];
+    byRace[e.race_id].push(e);
+  });
+
+  // Fetch race names
+  const raceIds = Object.keys(byRace);
+  const { data: raceRows } = await sbClient.from('races').select('race_id,name').in('race_id', raceIds);
+  const raceNames = {};
+  (raceRows || []).forEach(r => { raceNames[r.race_id] = r.name; });
+
+  const totalEntries = history.length;
   document.getElementById('drawerTotalCount').textContent =
-    `Totalt ${history.length} registrering${history.length !== 1 ? 'er' : ''}`;
+    `${raceIds.length} løp · ${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
 
   const body = document.getElementById('drawerBody');
   body.innerHTML = '';
 
-  history.forEach(e => {
-    const ts = new Date(e.timestamp).toLocaleString('nb-NO', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    });
-    const acc     = Math.round(e.accuracy_meters || 0);
-    const elapsed = formatElapsed(e.elapsed_seconds);
+  // Render newest race first
+  raceIds.reverse().forEach(raceId => {
+    const entries = byRace[raceId];
+    const raceName = escHtml(raceNames[raceId] || raceId);
+    const firstDate = new Date(entries[0].timestamp).toLocaleDateString('nb-NO', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-    const div = document.createElement('div');
-    div.className = 'h-entry';
-    div.innerHTML = `
-      <div class="h-entry-checkpoint">🏁 ${escHtml(e.checkpoint_name || '—')}</div>
-      <div class="h-entry-time">📅 ${ts}</div>
-      ${elapsed ? `<div class="h-entry-elapsed">⏱ ${escHtml(elapsed)} fra forrige</div>` : ''}
-      <div class="h-entry-acc">±${acc} m GPS-nøyaktighet</div>
-    `;
-    body.appendChild(div);
+    const raceDiv = document.createElement('div');
+    raceDiv.style.cssText = 'margin-bottom:12px; border:1px solid var(--border); border-radius:12px; overflow:hidden;';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--surface-2,var(--surface)); cursor:pointer;';
+    header.innerHTML = `
+      <div>
+        <div style="font-weight:700; font-size:0.95rem;">🏆 ${raceName}</div>
+        <div style="font-size:0.78rem; color:var(--muted); margin-top:2px;">${firstDate} · ${entries.length} sjekkpunkt${entries.length !== 1 ? 'er' : ''}</div>
+      </div>
+      <span style="font-size:1rem; color:var(--muted);">▼</span>`;
+
+    const entriesDiv = document.createElement('div');
+    entriesDiv.style.display = 'none';
+
+    entries.forEach(e => {
+      const ts = new Date(e.timestamp).toLocaleString('nb-NO', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      });
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:9px 14px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;';
+      row.innerHTML = `
+        <div style="font-size:0.88rem; font-weight:600;">🏁 ${escHtml(e.checkpoint_name || '—')}</div>
+        <div style="font-size:0.78rem; color:var(--muted);">${ts}</div>`;
+      entriesDiv.appendChild(row);
+    });
+
+    header.addEventListener('click', () => {
+      const open = entriesDiv.style.display !== 'none';
+      entriesDiv.style.display = open ? 'none' : '';
+      header.querySelector('span').textContent = open ? '▼' : '▲';
+    });
+
+    raceDiv.appendChild(header);
+    raceDiv.appendChild(entriesDiv);
+    body.appendChild(raceDiv);
   });
 }
 
@@ -2013,7 +2048,6 @@ async function registerPosition() {
     if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
       setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1500);
       setTimeout(() => {
-        localStorage.setItem(`race_done_${currentUser?.id}_${currentUser?.raceId}`, '1');
         doneCheckpoints.clear();
         rebuildMapMarkers();
         if (positionMarker) { const ll = positionMarker.getLatLng(); updateRegisterButton(ll.lat, ll.lng); }
