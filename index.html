@@ -2313,7 +2313,7 @@ function buildLeaderboard(data) {
         ${list.map((r, i) => `
           <tr class="${r.count === total ? 'lb-winner' : ''}">
             <td class="lb-rank">${i + 1}</td>
-            <td>${r.name}</td>
+            <td>${escHtml(r.name)}</td>
             <td>${r.count} / ${total}</td>
             <td>${fmt(r.secs)}</td>
           </tr>`).join('')}
@@ -2408,9 +2408,9 @@ async function sendRapportEmail() {
     const header = ['Navn','Sjekkpunkt nr','Sjekkpunkt navn','Dato','Klokkeslett','Tid fra forrige (sek)'];
     const tableRows = data.map(r => `
       <tr>
-        <td>${r.runner_name||''}</td>
-        <td>${r.checkpoint_order||''}</td>
-        <td>${r.checkpoint_name||''}</td>
+        <td>${escHtml(r.runner_name||'')}</td>
+        <td>${escHtml(String(r.checkpoint_order||''))}</td>
+        <td>${escHtml(r.checkpoint_name||'')}</td>
         <td>${new Date(r.timestamp).toLocaleDateString('nb-NO')}</td>
         <td>${new Date(r.timestamp).toLocaleTimeString('nb-NO')}</td>
         <td>${r.elapsed_seconds??''}</td>
@@ -2523,12 +2523,12 @@ async function renderAdminList() {
   }
   el.innerHTML = data.map(a => `
     <div class="cp-admin-item">
-      <div class="cp-admin-num">${a.admin_code}</div>
+      <div class="cp-admin-num">${escHtml(a.admin_code)}</div>
       <div class="cp-admin-info">
-        <div class="cp-admin-name">${a.email}</div>
-        <div class="cp-admin-coords">Kode: ${a.admin_code}</div>
+        <div class="cp-admin-name">${escHtml(a.email)}</div>
+        <div class="cp-admin-coords">Kode: ${escHtml(a.admin_code)}</div>
       </div>
-      <button class="cp-admin-del" data-id="${a.id}" title="Deaktiver">✕</button>
+      <button class="cp-admin-del" data-id="${escHtml(a.id)}" title="Deaktiver">✕</button>
     </div>`).join('');
   el.querySelectorAll('.cp-admin-del').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -2832,10 +2832,10 @@ async function renderCpAdminList() {
       <div class="cp-admin-item">
         <div class="cp-admin-num">${cp.cp_order}</div>
         <div class="cp-admin-info">
-          <div class="cp-admin-name">${cp.name}</div>
+          <div class="cp-admin-name">${escHtml(cp.name)}</div>
           <div class="cp-admin-coords">${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}</div>
         </div>
-        <button class="cp-admin-del" data-id="${cp.id}" title="Slett">✕</button>
+        <button class="cp-admin-del" data-id="${escHtml(cp.id)}" title="Slett">✕</button>
       </div>`).join('');
     el.querySelectorAll('.cp-admin-del').forEach(btn => {
       btn.addEventListener('click', async () => {
