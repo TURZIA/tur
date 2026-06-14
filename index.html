@@ -1559,6 +1559,7 @@ async function _fetchOsrmRoute(lat, lng, target) {
 
 function updateCompass(lat, lng) {
   if (!leafletMap) return;
+  if (currentUser?.email === CONFIG.ADMIN_EMAIL) { _clearArrow(); return; }
 
   const now = Date.now();
   const cpTimes = getCpTimes();
