@@ -767,6 +767,7 @@
       <button class="historikk-btn" id="statusBtn" style="display:none;">Status</button>
       <button class="historikk-btn" id="rapportBtn" style="display:none;">Rapport</button>
       <button class="historikk-btn" id="cpAdminBtn" style="display:none;">Sjekkpunkter</button>
+      <button class="historikk-btn" id="løpereBtn" style="display:none;">Løpere</button>
       <button class="historikk-btn" id="superAdminBtn" style="display:none;">Admins</button>
     </div>
   </header>
@@ -848,14 +849,29 @@
     <!-- نقاط السباق المختار -->
     <div id="cpAdminList"></div>
 
-    <!-- قائمة الراكضين المرتبطين بهذا الأدمن -->
-    <div class="rapport-card" style="margin-top:12px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="cpRunnersToggle">
-        <div class="rapport-card-title" style="margin-bottom:0;">Løpere</div>
-        <span id="cpRunnersChevron" style="font-size:1.1rem; color:var(--muted);">▼</span>
+  </div>
+</div>
+
+<!-- ===== LØPERE SCREEN ===== -->
+<div id="løpereScreen" class="screen">
+  <div class="rapport-header">
+    <button class="rapport-back" id="løpereBackBtn">← Tilbake</button>
+    <span class="rapport-title">Løpere</span>
+  </div>
+  <div class="rapport-body">
+
+    <div class="rapport-card">
+      <div id="løpereCount" style="font-size:1.1rem; font-weight:700; margin-bottom:16px;">0 deltakere</div>
+      <!-- Add runner by email -->
+      <div class="input-label">Legg til løper via e-post</div>
+      <div style="display:flex; gap:8px; margin-top:4px;">
+        <input type="email" id="løpereAddEmail" placeholder="løper@epost.no" autocorrect="off" autocapitalize="off" style="flex:1;" />
+        <button id="løpereAddBtn" style="background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:0.88rem;font-weight:600;cursor:pointer;white-space:nowrap;">+ Legg til</button>
       </div>
-      <div id="cpRunnersList" style="display:none; margin-top:12px;"></div>
+      <div id="løpereAddMsg" style="display:none; font-size:0.82rem; margin-top:6px;"></div>
     </div>
+
+    <div id="løpereList" style="margin-top:4px;"></div>
 
   </div>
 </div>
@@ -2129,6 +2145,7 @@ async function onAuthSuccess(user, nameOverride) {
 
   document.getElementById('rapportBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('cpAdminBtn').style.display    = isAdmin ? '' : 'none';
+  document.getElementById('løpereBtn').style.display     = (isAdmin && !isSuperAdmin) ? '' : 'none';
   document.getElementById('superAdminBtn').style.display = isSuperAdmin ? '' : 'none';
   document.querySelector('.register-wrap').style.display  = isSuperAdmin ? 'none' : '';
   document.getElementById('legendNextCp').style.display   = isSuperAdmin ? 'none' : '';
@@ -2700,36 +2717,62 @@ async function openCpAdminScreen() {
   showScreen('cpAdminScreen');
   await _loadCpRaceDropdown();
   await renderCpAdminList();
-  // Setup runners toggle
-  const toggle = document.getElementById('cpRunnersToggle');
-  toggle.onclick = async () => {
-    const list = document.getElementById('cpRunnersList');
-    const chevron = document.getElementById('cpRunnersChevron');
-    if (list.style.display === 'none') {
-      list.style.display = '';
-      chevron.textContent = '▲';
-      await loadAdminRunnersList();
-    } else {
-      list.style.display = 'none';
-      chevron.textContent = '▼';
-    }
-  };
 }
 
-async function loadAdminRunnersList() {
-  const list = document.getElementById('cpRunnersList');
-  if (!currentUser?.adminCode) { list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Ingen løpere funnet.</div>'; return; }
-  list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Laster…</div>';
-  const { data, error } = await sbClient.from('runners').select('name,email').eq('race_id', currentUser.adminCode).order('name');
-  if (error || !data || data.length === 0) {
-    list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Ingen løpere koblet til deg ennå.</div>';
+function openLøpereScreen() {
+  showScreen('løpereScreen');
+  loadLøpereList();
+}
+
+async function loadLøpereList() {
+  const list = document.getElementById('løpereList');
+  const countEl = document.getElementById('løpereCount');
+  if (!currentUser?.adminCode) {
+    countEl.textContent = '0 deltakere';
+    list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Ingen løpere koblet til deg ennå.</div>';
     return;
   }
+  list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Laster…</div>';
+  const { data, error } = await sbClient.from('runners').select('id,name,email').eq('race_id', currentUser.adminCode).order('name');
+  if (error || !data || data.length === 0) {
+    countEl.textContent = '0 deltakere';
+    list.innerHTML = '<div class="rapport-card" style="color:var(--muted);font-size:0.85rem;">Ingen løpere koblet til deg ennå.</div>';
+    return;
+  }
+  countEl.textContent = `${data.length} deltaker${data.length !== 1 ? 'e' : ''}`;
   list.innerHTML = data.map(r => `
-    <div style="display:flex; flex-direction:column; padding:8px 0; border-bottom:1px solid var(--border);">
-      <span style="font-weight:600; font-size:0.92rem;">${escHtml(r.name)}</span>
-      <span style="font-size:0.8rem; color:var(--muted);">${escHtml(r.email)}</span>
+    <div class="rapport-card" style="display:flex; align-items:center; gap:12px; padding:10px 14px;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:600; font-size:0.92rem;">${escHtml(r.name || '—')}</div>
+        <div style="font-size:0.8rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(r.email || '—')}</div>
+      </div>
+      <button onclick="removeRunner('${escHtml(r.id)}')" style="background:none;border:1px solid var(--red);border-radius:8px;padding:6px 12px;color:var(--red);font-size:0.82rem;cursor:pointer;flex-shrink:0;">Fjern</button>
     </div>`).join('');
+}
+
+async function removeRunner(runnerId) {
+  if (!confirm('Fjerne denne løperen fra listen?')) return;
+  await sbClient.from('runners').update({ race_id: null }).eq('id', runnerId);
+  await loadLøpereList();
+}
+
+async function addRunnerByEmail() {
+  const emailInput = document.getElementById('løpereAddEmail');
+  const msgEl = document.getElementById('løpereAddMsg');
+  const email = emailInput.value.trim().toLowerCase();
+  msgEl.style.display = 'none';
+  if (!email) return;
+
+  const showMsg = (txt, color) => { msgEl.textContent = txt; msgEl.style.color = color; msgEl.style.display = ''; };
+
+  const { data, error } = await sbClient.from('runners').select('id,name,race_id').eq('email', email).single();
+  if (error || !data) { showMsg('Fant ingen bruker med denne e-posten.', 'var(--red)'); return; }
+  if (data.race_id === currentUser.adminCode) { showMsg('Denne løperen er allerede koblet til deg.', 'var(--muted)'); return; }
+
+  await sbClient.from('runners').update({ race_id: currentUser.adminCode }).eq('id', data.id);
+  showMsg(`${data.name} er lagt til!`, 'var(--green-dk)');
+  emailInput.value = '';
+  await loadLøpereList();
 }
 
 async function _loadCpRaceDropdown() {
@@ -3118,6 +3161,8 @@ async function refreshCurrentScreen() {
       await loadDrawerHistory();
   } else if (active === 'cpAdminScreen') {
     await renderCpAdminList();
+  } else if (active === 'løpereScreen') {
+    await loadLøpereList();
   } else if (active === 'superAdminScreen') {
     await renderAdminList();
   } else if (active === 'rapportScreen') {
@@ -3181,6 +3226,9 @@ async function init() {
   document.getElementById('rapportBackBtn').addEventListener('click', () => showScreen('mainScreen'));
   document.getElementById('cpAdminBtn').addEventListener('click', openCpAdminScreen);
   document.getElementById('cpAdminBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('løpereBtn').addEventListener('click', openLøpereScreen);
+  document.getElementById('løpereBackBtn').addEventListener('click', () => showScreen('mainScreen'));
+  document.getElementById('løpereAddBtn').addEventListener('click', addRunnerByEmail);
   document.getElementById('cpNewRaceHeaderBtn').addEventListener('click', openNewRaceScreen);
   // صفحة الإنشاء الجديدة
   document.getElementById('cpNewRaceBackBtn').addEventListener('click', async () => {
