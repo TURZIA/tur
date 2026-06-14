@@ -758,6 +758,7 @@
     </div>
     <div class="header-row2">
       <button class="historikk-btn" id="historikkBtn">Historikk</button>
+      <button class="historikk-btn" id="statusBtn" style="display:none;">Status</button>
       <button class="historikk-btn" id="rapportBtn" style="display:none;">Rapport</button>
       <button class="historikk-btn" id="cpAdminBtn" style="display:none;">Sjekkpunkter</button>
       <button class="historikk-btn" id="superAdminBtn" style="display:none;">Admins</button>
@@ -939,6 +940,16 @@
   <div class="drawer-body" id="drawerBody">
     <div class="drawer-loading">Laster…</div>
   </div>
+</div>
+
+<!-- ===== STATUS DRAWER (super admin) ===== -->
+<div id="statusDrawerOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1100;" onclick="closeStatusDrawer()"></div>
+<div id="statusDrawer" style="display:none; position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-radius:18px 18px 0 0; z-index:1101; max-height:70vh; overflow-y:auto; padding:20px 20px 32px;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <span style="font-size:1.05rem; font-weight:700;">System Status</span>
+    <button onclick="closeStatusDrawer()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);">✕</button>
+  </div>
+  <div id="statusContent" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
 </div>
 
 <!-- ===== GPS OVERLAY ===== -->
@@ -2075,6 +2086,8 @@ async function onAuthSuccess(user, nameOverride) {
   document.getElementById('cpAdminBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('superAdminBtn').style.display = isSuperAdmin ? '' : 'none';
   document.getElementById('registerBtn').style.display   = isSuperAdmin ? 'none' : '';
+  document.getElementById('historikkBtn').style.display  = isSuperAdmin ? 'none' : '';
+  document.getElementById('statusBtn').style.display     = isSuperAdmin ? '' : 'none';
 
   await loadCheckpointsFromSupabase(adminCode);
   startMainScreen(currentUser);
@@ -3055,6 +3068,7 @@ async function init() {
 
   // Drawer
   document.getElementById('historikkBtn').addEventListener('click', openDrawer);
+  document.getElementById('statusBtn').addEventListener('click', openStatusDrawer);
   document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
 
@@ -3125,6 +3139,42 @@ async function init() {
       showScreen('loginScreen');
     }
   });
+}
+
+function closeStatusDrawer() {
+  document.getElementById('statusDrawer').style.display = 'none';
+  document.getElementById('statusDrawerOverlay').style.display = 'none';
+}
+
+async function openStatusDrawer() {
+  document.getElementById('statusDrawer').style.display = 'block';
+  document.getElementById('statusDrawerOverlay').style.display = 'block';
+  const el = document.getElementById('statusContent');
+  el.innerHTML = '<div style="color:var(--muted);grid-column:1/-1;text-align:center;">Laster…</div>';
+
+  const [
+    { count: cpCount  },
+    { count: admCount },
+    { count: rnCount  },
+    { count: rcCount  },
+  ] = await Promise.all([
+    sbClient.from('checkpoints').select('*', { count: 'exact', head: true }),
+    sbClient.from('admins').select('*',      { count: 'exact', head: true }).eq('is_active', true),
+    sbClient.from('runners').select('*',     { count: 'exact', head: true }),
+    sbClient.from('races').select('*',       { count: 'exact', head: true }).eq('is_active', true),
+  ]);
+
+  const card = (label, value, color) => `
+    <div style="background:var(--surface-2,#f4f4f4); border-radius:12px; padding:16px 12px; text-align:center;">
+      <div style="font-size:2rem; font-weight:800; color:${color};">${value ?? '—'}</div>
+      <div style="font-size:0.8rem; color:var(--muted); margin-top:4px;">${label}</div>
+    </div>`;
+
+  el.innerHTML =
+    card('Sjekkpunkter', cpCount, '#0EA371') +
+    card('Admins',       admCount, '#3B82F6') +
+    card('Løpere',       rnCount,  '#8B5CF6') +
+    card('Løp (aktive)', rcCount,  '#C9A800');
 }
 
 document.addEventListener('DOMContentLoaded', init);
