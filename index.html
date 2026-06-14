@@ -2778,9 +2778,8 @@ async function addRunnerByEmail() {
 
   const showMsg = (txt, color) => { msgEl.textContent = txt; msgEl.style.color = color; msgEl.style.display = ''; };
 
-  // Block adding an admin account
-  const { data: adminCheck } = await sbClient.from('admins').select('admin_code').eq('email', email).eq('is_active', true).single();
-  if (adminCheck) { showMsg('Arrangører kan ikke legges til som løpere.', 'var(--amber)'); return; }
+  // Block admin from adding themselves
+  if (email === currentUser.email.toLowerCase()) { showMsg('Du kan ikke legge til deg selv.', 'var(--amber)'); return; }
 
   const { data, error } = await sbClient.from('runners').select('id,name,race_id').eq('email', email).single();
   if (error || !data) { showMsg('Fant ingen bruker med denne e-posten.', 'var(--red)'); return; }
