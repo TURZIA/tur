@@ -1605,7 +1605,7 @@ let arrowHead = null;   // L.marker رأس السهم
 // OSRM state
 let _osrmTarget = null, _osrmTimer = null;
 let _hasRoadRoute = false;   // true = road route er tegnet, ikke tegn rett linje
-const OSRM_DEBOUNCE = 3000;
+const OSRM_DEBOUNCE = 800;
 
 function _clearArrow() {
   if (arrowLine) { leafletMap.removeLayer(arrowLine); arrowLine = null; }
@@ -1643,7 +1643,7 @@ function _drawStraightArrow(lat, lng, target, dist) {
 async function _fetchSingleRoute(profileUrl, lng1, lat1, lng2, lat2) {
   const url = `${profileUrl}${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson&steps=false`;
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 6000);
+  const t = setTimeout(() => ctrl.abort(), 5000);
   try {
     const res  = await fetch(url, { signal: ctrl.signal });
     clearTimeout(t);
@@ -3242,17 +3242,18 @@ async function _drawRaceRouteInner() {
     }
   } catch(e) {}
 
-  // Fetch each segment using both foot and car — pick shortest
-  const segments = [];
-  for (let i = 0; i < cps.length - 1; i++) {
-    const a = cps[i], b = cps[i + 1];
-    const [foot, car] = await Promise.all([
-      _fetchSingleRoute('https://routing.openstreetmap.de/routed-foot/route/v1/foot/', a.lng, a.lat, b.lng, b.lat),
-      _fetchSingleRoute('https://routing.openstreetmap.de/routed-car/route/v1/driving/', a.lng, a.lat, b.lng, b.lat),
-    ]);
-    const best = [foot, car].filter(Boolean).sort((a, b) => a.distance - b.distance)[0];
-    segments.push(best?.coords || null);
-  }
+  // Fetch ALL segments in parallel (both foot+car per segment simultaneously)
+  const segments = await Promise.all(
+    cps.slice(0, -1).map(async (a, i) => {
+      const b = cps[i + 1];
+      const [foot, car] = await Promise.all([
+        _fetchSingleRoute('https://routing.openstreetmap.de/routed-foot/route/v1/foot/', a.lng, a.lat, b.lng, b.lat),
+        _fetchSingleRoute('https://routing.openstreetmap.de/routed-car/route/v1/driving/', a.lng, a.lat, b.lng, b.lat),
+      ]);
+      const best = [foot, car].filter(Boolean).sort((x, y) => x.distance - y.distance)[0];
+      return best?.coords || null;
+    })
+  );
 
   if (segments.every(s => s === null)) return; // all failed
 
