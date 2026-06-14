@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>html { background: #F5F7FA; } #loginScreen, #resetPasswordScreen { background: linear-gradient(160deg, #0EA371 0%, #0B7D57 50%, #F5F7FA 50%); } #splashLoader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#F5F7FA;transition:opacity .3s}#splashLoader.hide{opacity:0;pointer-events:none}</style>
+  <style>html { background: #0B7D57; } #loginScreen, #resetPasswordScreen { background: linear-gradient(160deg, #0EA371 0%, #0B7D57 50%, #F5F7FA 50%); } #splashLoader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#F5F7FA;transition:opacity .3s}#splashLoader.hide{opacity:0;pointer-events:none}</style>
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -81,7 +81,7 @@
     #offlineBanner.visible { display: block; }
 
     /* ===== SCREENS ===== */
-    .screen { display: none; flex-direction: column; height: 100dvh; }
+    .screen { display: none; flex-direction: column; height: 100dvh; background: var(--bg); }
     .screen.active { display: flex; }
 
     /* ===== LOGIN ===== */
