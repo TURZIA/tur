@@ -3043,7 +3043,7 @@ function openNewRaceScreen() {
   document.getElementById('cpNRName').value    = '';
   document.getElementById('cpNRName').disabled = false;
   document.getElementById('cpNRCreateBtn').disabled = false;
-  document.getElementById('cpNRCreateBtn').textContent = '+ Opprett løp';
+  document.getElementById('cpNRCreateBtn').textContent = '+ Opprett tur';
   renderNRRacesList();
 }
 
@@ -3240,7 +3240,7 @@ async function renderCpAdminList() {
   el.innerHTML = '<div class="list-empty">Laster…</div>';
   try {
     const raceId = _cpAdminRaceId();
-    if (!raceId) { el.innerHTML = '<div class="list-empty">Velg et løp ovenfor.</div>'; return; }
+    if (!raceId) { el.innerHTML = '<div class="list-empty">Velg en tur ovenfor.</div>'; return; }
     const { data } = await sbClient.from('checkpoints')
       .select('*').eq('race_id', raceId)
       .order('cp_order', { ascending: true });
