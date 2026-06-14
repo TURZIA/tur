@@ -2779,7 +2779,7 @@ async function addRunnerByEmail() {
   const showMsg = (txt, color) => { msgEl.textContent = txt; msgEl.style.color = color; msgEl.style.display = ''; };
 
   // Block admin from adding themselves
-  if (email === currentUser.email.toLowerCase()) { showMsg('Du kan ikke legge til deg selv.', 'var(--amber)'); return; }
+  if (email === currentUser.email.toLowerCase()) { showMsg('Du er allerede med!', 'var(--amber)'); return; }
 
   const { data, error } = await sbClient.from('runners').select('id,name,race_id').eq('email', email).single();
   if (error || !data) { showMsg('Fant ingen bruker med denne e-posten.', 'var(--red)'); return; }
