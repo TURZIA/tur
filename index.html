@@ -2425,7 +2425,6 @@ async function handleSignout() {
 async function startMainScreen(runner) {
   document.getElementById('headerRaceName').textContent   = CONFIG.RACE_NAME;
   document.getElementById('headerRunnerName').textContent = runner.name;
-  document.getElementById('loginTitle').textContent       = CONFIG.RACE_NAME;
 
   showScreen('mainScreen');
   initCompass();   // start tidlig så iOS-tillatelse er klar
@@ -3693,7 +3692,6 @@ async function init() {
   setupIosBanner();
   setupAndroidInstall();
 
-  document.getElementById('loginTitle').textContent = CONFIG.RACE_NAME;
 
   // Auth buttons
   document.getElementById('signinBtn').addEventListener('click', handleSignin);
