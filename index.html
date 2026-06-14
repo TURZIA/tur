@@ -839,8 +839,9 @@
         <option value="">-- Velg et løp --</option>
       </select>
       <!-- race actions -->
-      <div id="cpRaceInfo" style="display:none; margin-top:12px;">
-        <button id="cpActivateRaceBtn" style="width:100%; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver for løpere</button>
+      <div id="cpRaceInfo" style="display:none; margin-top:12px; display:flex; gap:8px;">
+        <button id="cpActivateRaceBtn" style="flex:1; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver</button>
+        <button id="cpDeactivateRaceBtn" style="flex:1; background:none; border:1px solid var(--muted); border-radius:8px; padding:8px 14px; font-size:0.88rem; color:var(--muted); cursor:pointer;">✗ Deaktiver</button>
       </div>
       <div id="cpRaceActiveBadge" style="display:none; margin-top:8px; font-size:0.8rem; color:var(--green-dk); font-weight:600;">● Aktivt løp for løpere</div>
     </div>
@@ -2896,9 +2897,10 @@ async function _loadCpRaceDropdown() {
   const newRaceBtn = document.getElementById('cpNewRaceHeaderBtn');
   if (newRaceBtn) newRaceBtn.style.display = '';
 
-  // Super admin sees all activated races; regular admin sees only their active race
-  let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).eq('is_current', true).order('created_at');
+  // Regular admin sees all their races; super admin sees all active races
+  let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
+  else query = query.eq('is_current', true);
   const { data: races } = await query;
 
   const prev = sel.value;
@@ -2912,15 +2914,36 @@ async function _loadCpRaceDropdown() {
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
 
   const _updateRaceInfo = async () => {
-    const raceId    = sel.value;
-    const info      = document.getElementById('cpRaceInfo');
-    const activateBtn = document.getElementById('cpActivateRaceBtn');
-    const badge     = document.getElementById('cpRaceActiveBadge');
+    const raceId = sel.value;
+    const info   = document.getElementById('cpRaceInfo');
+    const badge  = document.getElementById('cpRaceActiveBadge');
     if (raceId) {
-      // Activate button only shown in Nytt løp now; here just show badge
-      info.style.display = 'none';
-      badge.style.display = '';
-      badge.textContent = '● Aktivt løp for løpere';
+      info.style.display = isSuperAdmin ? 'none' : 'flex';
+      badge.style.display = 'none';
+      const activateBtn   = document.getElementById('cpActivateRaceBtn');
+      const deactivateBtn = document.getElementById('cpDeactivateRaceBtn');
+      const { data: r } = await sbClient.from('races').select('is_current').eq('race_id', raceId).single();
+      const isActive = !!r?.is_current;
+      if (badge) { badge.style.display = isActive ? '' : 'none'; badge.textContent = '● Aktivt løp for løpere'; }
+      if (activateBtn) {
+        activateBtn.disabled = isActive;
+        activateBtn.style.opacity = isActive ? '0.4' : '1';
+        activateBtn.onclick = async () => {
+          await activateRace(raceId, currentUser.adminCode);
+          await _updateRaceInfo();
+        };
+      }
+      if (deactivateBtn) {
+        deactivateBtn.disabled = !isActive;
+        deactivateBtn.style.opacity = !isActive ? '0.4' : '1';
+        deactivateBtn.onclick = async () => {
+          if (!confirm('Deaktiver løpet for løpere?')) return;
+          await sbClient.from('races').update({ is_current: false }).eq('race_id', raceId);
+          if (currentUser) currentUser.raceId = null;
+          showToast('Løpet er deaktivert', 't-warn', 2500);
+          await _updateRaceInfo();
+        };
+      }
     } else {
       info.style.display = 'none';
       if (badge) badge.style.display = 'none';
