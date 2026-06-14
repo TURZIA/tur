@@ -2225,7 +2225,7 @@ async function handleSendReset() {
     // تحقق من وجود الإيميل في النظام
     const { data: runner } = await sbClient.from('runners').select('id').eq('email', email).maybeSingle();
     const { data: admin } = await sbClient.from('admins').select('id').eq('email', email).maybeSingle();
-    const isSuperAdmin = email === CONFIG.ADMIN_EMAIL;
+    const isSuperAdmin = email.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
     if (!runner && !admin && !isSuperAdmin) {
       showMsg(msg, 'Denne e-postadressen er ikke registrert.', 'red');
       return;
@@ -2306,7 +2306,7 @@ async function handleSignup() {
   if (password.length < 6) { showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
 
   // Check if this email is super admin or already registered as an admin — no code needed
-  const isSuperAdmin = email === CONFIG.ADMIN_EMAIL;
+  const isSuperAdmin = email.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
   const { data: adminEmailRow } = await sbClient.from('admins').select('admin_code').eq('email', email).eq('is_active', true).single();
   const isAdminSignup = !!adminEmailRow || isSuperAdmin;
 
