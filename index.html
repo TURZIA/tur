@@ -2325,6 +2325,7 @@ function startRealtime(runner) {
   if (realtimeChannel) sbClient.removeChannel(realtimeChannel);
 
   const isSuperAdmin = runner.email === CONFIG.ADMIN_EMAIL;
+  const isAdmin      = isSuperAdmin || !!runner.adminCode;
   // raceId is the resolved race_id (set by loadCheckpointsFromSupabase); adminCode is the admin link
   const raceId    = runner.raceId    || null;
   const adminCode = runner.adminCode || null;
@@ -2380,12 +2381,57 @@ function startRealtime(runner) {
     }, async payload => {
       if (payload.new?.admin_code !== adminCode) return;
       if (!payload.new?.is_current) return;
-      // Admin activated this race — reload checkpoints
       await loadCheckpointsFromSupabase(adminCode);
       rebuildMapMarkers();
       if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
       drawRaceRoute();
       showToast('Arrangøren har aktivert et nytt løp', 't-success', 3000);
+    });
+  }
+
+  // ── Admin/super-admin realtime ──────────────────────────────
+
+  // runners: refresh Løpere screen when a runner joins/leaves
+  if (isAdmin) {
+    ch.on('postgres_changes', {
+      event: '*', schema: 'public', table: 'runners',
+    }, () => {
+      const activeScreen = document.querySelector('.screen.active')?.id;
+      if (activeScreen === 'løpereScreen') loadLøpereList();
+    });
+  }
+
+  // races: refresh Nytt løp and Sjekkpunkter dropdown on any race change
+  if (isAdmin) {
+    ch.on('postgres_changes', {
+      event: '*', schema: 'public', table: 'races',
+    }, async () => {
+      const activeScreen = document.querySelector('.screen.active')?.id;
+      if (activeScreen === 'cpNewRaceScreen') await renderNRRacesList();
+      if (activeScreen === 'cpAdminScreen')   await _loadCpRaceDropdown();
+    });
+  }
+
+  // checkpoints: refresh Sjekkpunkter list when checkpoint changes happen
+  if (isAdmin) {
+    ch.on('postgres_changes', {
+      event: '*', schema: 'public', table: 'checkpoints',
+    }, async () => {
+      const activeScreen = document.querySelector('.screen.active')?.id;
+      if (activeScreen === 'cpAdminScreen') await renderCpAdminList();
+      if (activeScreen === 'cpNewRaceScreen') await renderNRRacesList();
+    });
+  }
+
+  // admins UPDATE: notify runner if their admin is deactivated
+  if (!isSuperAdmin && !isAdmin && adminCode) {
+    ch.on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'admins',
+    }, payload => {
+      if (payload.new?.admin_code !== adminCode) return;
+      if (!payload.new?.is_active) {
+        showToast('Arrangøren din er ikke lenger aktiv', 't-error', 5000);
+      }
     });
   }
 
