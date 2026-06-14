@@ -965,6 +965,7 @@
     <div>Løper: <strong id="drawerRunnerName">—</strong></div>
     <div id="drawerAdminCode" style="display:none; margin-top:4px; font-size:0.85rem; color:var(--muted);">Kode: <strong id="drawerAdminCodeValue" style="color:var(--text); letter-spacing:0.08em;"></strong></div>
     <div id="drawerTotalCount" style="margin-top:2px"></div>
+    <button id="byttArrangorBtn" style="display:none; margin-top:10px; background:none; border:1px solid var(--muted); border-radius:8px; padding:6px 14px; font-size:0.82rem; color:var(--muted); cursor:pointer;">Endre arrangørkode</button>
   </div>
   <div class="drawer-body" id="drawerBody">
     <div class="drawer-loading">Laster…</div>
@@ -1810,14 +1811,17 @@ async function loadDrawerHistory() {
   if (!runner) return;
 
   document.getElementById('drawerRunnerName').textContent = runner.name;
+  const isAdminUser = document.getElementById('cpAdminBtn').style.display !== 'none' && runner.email !== CONFIG.ADMIN_EMAIL;
   const adminCodeEl = document.getElementById('drawerAdminCode');
-  const showCode = document.getElementById('cpAdminBtn').style.display !== 'none' && runner.email !== CONFIG.ADMIN_EMAIL && runner.adminCode;
-  if (showCode) {
+  if (isAdminUser && runner.adminCode) {
     document.getElementById('drawerAdminCodeValue').textContent = runner.adminCode;
     adminCodeEl.style.display = '';
   } else {
     adminCodeEl.style.display = 'none';
   }
+  // "Endre arrangørkode" only for regular runners (not admins, not super admin)
+  const byttBtn = document.getElementById('byttArrangorBtn');
+  byttBtn.style.display = (!isAdminUser && runner.email !== CONFIG.ADMIN_EMAIL) ? '' : 'none';
   document.getElementById('drawerBody').innerHTML = '<div class="drawer-loading">Laster historikk…</div>';
 
   const history = await fetchRunnerHistory(runner.id);
@@ -2123,7 +2127,7 @@ async function onAuthSuccess(user, nameOverride) {
   // Only check/clear runners link if user is NOT an admin
   if (!isAdmin) {
     try {
-      const { data } = await sbClient.from('runners').select('name,race_id').eq('id', user.id).single();
+      const { data } = await sbClient.from('runners').select('name,race_id,prev_race_id').eq('id', user.id).single();
       if (data?.name && !name) name = data.name;
       if (data?.race_id) {
         const { data: activeAdmin } = await sbClient.from('admins')
@@ -2131,8 +2135,17 @@ async function onAuthSuccess(user, nameOverride) {
         if (activeAdmin) {
           runnerAdminCode = data.race_id;
         } else {
-          // Admin deactivated — clear the stale link
-          await sbClient.from('runners').update({ race_id: null }).eq('id', user.id);
+          // Admin deactivated — save prev and clear current link
+          await sbClient.from('runners').update({ race_id: null, prev_race_id: data.race_id }).eq('id', user.id);
+        }
+      } else if (!data?.race_id && data?.prev_race_id) {
+        // No current link — check if previous admin is back active
+        const { data: prevAdmin } = await sbClient.from('admins')
+          .select('admin_code').eq('admin_code', data.prev_race_id).eq('is_active', true).single();
+        if (prevAdmin) {
+          // Auto-restore link to previous admin
+          await sbClient.from('runners').update({ race_id: data.prev_race_id }).eq('id', user.id);
+          runnerAdminCode = data.prev_race_id;
         }
       }
     } catch {}
@@ -3217,6 +3230,13 @@ async function init() {
   document.getElementById('historikkBtn').addEventListener('click', openDrawer);
   document.getElementById('statusBtn').addEventListener('click', openStatusDrawer);
   document.getElementById('linkAdminBtn').addEventListener('click', handleLinkAdmin);
+  document.getElementById('byttArrangorBtn').addEventListener('click', async () => {
+    // Clear current admin link so runner can pick a new one
+    await sbClient.from('runners').update({ race_id: null, prev_race_id: null }).eq('id', currentUser.id);
+    currentUser.adminCode = null;
+    closeDrawer();
+    setTimeout(() => showLinkAdminPopup(), 300);
+  });
   document.getElementById('linkAdminInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleLinkAdmin(); });
   document.getElementById('drawerCloseBtn').addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
@@ -3318,6 +3338,8 @@ async function handleLinkAdmin() {
   }
 
   await saveRunnerToSupabase(currentUser.id, currentUser.name, code, currentUser.email);
+  // Clear prev_race_id — runner has intentionally chosen a new admin
+  await sbClient.from('runners').update({ prev_race_id: null }).eq('id', currentUser.id);
   currentUser.adminCode = code;
   document.getElementById('linkAdminOverlay').style.display = 'none';
 
