@@ -2077,8 +2077,17 @@ async function onAuthSuccess(user, nameOverride) {
   try {
     const { data } = await sbClient.from('runners').select('name,race_id').eq('id', user.id).single();
     if (data?.name && !name) name = data.name;
-    // race_id column now stores admin_code (the admin this runner belongs to)
-    if (data?.race_id) runnerAdminCode = data.race_id;
+    if (data?.race_id) {
+      // Verify the linked admin is still active
+      const { data: activeAdmin } = await sbClient.from('admins')
+        .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).single();
+      if (activeAdmin) {
+        runnerAdminCode = data.race_id;
+      } else {
+        // Admin deactivated — clear the stale link
+        await sbClient.from('runners').update({ race_id: null }).eq('id', user.id);
+      }
+    }
   } catch {}
 
   if (!name) name = user.email.split('@')[0];
