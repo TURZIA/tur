@@ -938,6 +938,7 @@
   </div>
   <div class="drawer-runner-info">
     <div>Løper: <strong id="drawerRunnerName">—</strong></div>
+    <div id="drawerAdminCode" style="display:none; margin-top:4px; font-size:0.85rem; color:var(--muted);">Kode: <strong id="drawerAdminCodeValue" style="color:var(--text); letter-spacing:0.08em;"></strong></div>
     <div id="drawerTotalCount" style="margin-top:2px"></div>
   </div>
   <div class="drawer-body" id="drawerBody">
@@ -1783,6 +1784,14 @@ async function loadDrawerHistory() {
   if (!runner) return;
 
   document.getElementById('drawerRunnerName').textContent = runner.name;
+  const adminCodeEl = document.getElementById('drawerAdminCode');
+  const showCode = document.getElementById('cpAdminBtn').style.display !== 'none' && runner.email !== CONFIG.ADMIN_EMAIL && runner.adminCode;
+  if (showCode) {
+    document.getElementById('drawerAdminCodeValue').textContent = runner.adminCode;
+    adminCodeEl.style.display = '';
+  } else {
+    adminCodeEl.style.display = 'none';
+  }
   document.getElementById('drawerBody').innerHTML = '<div class="drawer-loading">Laster historikk…</div>';
 
   const history = await fetchRunnerHistory(runner.id);
