@@ -3190,7 +3190,7 @@ async function _loadCpRaceDropdown() {
           await sbClient.from('races').update({ is_current: false }).eq('race_id', raceId);
           if (currentUser) currentUser.raceId = null;
           showToast('Løpet er deaktivert', 't-warn', 2500);
-          await _updateRaceInfo();
+          await _refreshAllRaceUI();
         };
       }
     } else {
@@ -3397,13 +3397,20 @@ async function activateRace(raceId, adminCode) {
   await sbClient.from('races').update({ is_current: true  }).eq('race_id', raceId);
   if (currentUser) currentUser.raceId = raceId;
   showToast('Turen er aktivert for alle deltakere', 't-success', 2500);
+  await _refreshAllRaceUI();
+}
+
+async function _refreshAllRaceUI() {
+  await Promise.all([
+    _loadCpRaceDropdown(),
+    renderNRRacesList(),
+  ]);
 }
 
 async function activateRaceNR(raceId) {
   const { data: r } = await sbClient.from('races').select('admin_code').eq('race_id', raceId).single();
   if (!r) return;
   await activateRace(raceId, r.admin_code);
-  await renderNRRacesList();
 }
 
 async function deleteRace(raceId) {
