@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>html { background: #F5F7FA; } #loginScreen, #resetPasswordScreen { background: linear-gradient(160deg, #0EA371 0%, #0B7D57 40%, #F5F7FA 40%); }</style>
+  <style>html { background: #F5F7FA; } #loginScreen, #resetPasswordScreen { background: linear-gradient(160deg, #0EA371 0%, #0B7D57 40%, #F5F7FA 40%); } #splashLoader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#F5F7FA;transition:opacity .3s}#splashLoader.hide{opacity:0;pointer-events:none}</style>
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -644,11 +644,12 @@
   </style>
 </head>
 <body>
+<div id="splashLoader"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0EA371" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10" opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur=".8s" repeatCount="indefinite"/></path></svg></div>
 
 <div id="offlineBanner">📵 Ingen internettforbindelse — data lagres lokalt</div>
 
 <!-- ===== LOGIN ===== -->
-<div id="loginScreen" class="screen active">
+<div id="loginScreen" class="screen">
   <div class="login-logo">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="80" height="80" style="border-radius:20px">
       <defs>
@@ -3725,6 +3726,7 @@ async function init() {
   }
 
   // تحقق من جلسة موجودة — إذا موجودة يدخل مباشرة بدون تسجيل دخول
+  const splash = document.getElementById('splashLoader');
   try {
     const { data: { session } } = await sbClient.auth.getSession();
     if (session?.user) {
@@ -3735,6 +3737,7 @@ async function init() {
   } catch {
     showScreen('loginScreen');
   }
+  if (splash) { splash.classList.add('hide'); setTimeout(() => splash.remove(), 350); }
 
   // استمع لتغييرات الجلسة (logout من تبويب آخر مثلاً)
   sbClient.auth.onAuthStateChange(async (event, session) => {
