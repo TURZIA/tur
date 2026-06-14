@@ -1441,19 +1441,32 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
   const doneOrders = Object.keys(latestByOrder).map(Number);
   const allDone    = totalCps > 0 && allOrders.every(o => doneOrders.includes(o));
 
+  const raceCompletedKey = `race_done_${currentUser?.id}_${currentUser?.raceId}`;
+  const alreadyAcknowledged = localStorage.getItem(raceCompletedKey) === '1';
+
+  if (allDone && alreadyAcknowledged) {
+    // Already celebrated — show everything green (fresh start)
+    return;
+  }
+
   Object.entries(latestByOrder).forEach(([order, entry]) => {
     const doneToday = new Date(entry.timestamp).toDateString() === today;
-    if (allDone || doneToday) {
-      // All done (permanent) OR done today → mark as done
+    if (!allDone && doneToday) {
       markCheckpointDone(Number(order), entry.race_id);
       doneCheckpoints.add(Number(order));
     }
-    // else: done on a previous day and race not finished → checkpoint resets to green
+    // allDone handled below; previous day + incomplete → green
   });
 
-  if (allDone) {
+  if (allDone && !alreadyAcknowledged) {
+    // First time seeing completion — celebrate then reset
+    Object.entries(latestByOrder).forEach(([order, entry]) => {
+      markCheckpointDone(Number(order), entry.race_id);
+      doneCheckpoints.add(Number(order));
+    });
     setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1000);
     setTimeout(() => {
+      localStorage.setItem(raceCompletedKey, '1');
       doneCheckpoints.clear();
       rebuildMapMarkers();
     }, 10000);
@@ -1998,11 +2011,10 @@ async function registerPosition() {
     const allOrders = CONFIG.CHECKPOINTS.map(cp => cp.order);
     if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
       setTimeout(() => showToast('Gratulerer! Du har fullført løpet! 🎉', 't-success', 8000), 1500);
-      // After congrats, reset all checkpoints to green
       setTimeout(() => {
+        localStorage.setItem(`race_done_${currentUser?.id}_${currentUser?.raceId}`, '1');
         doneCheckpoints.clear();
         rebuildMapMarkers();
-        if (currentUser?.id) loadPreviousRegistrationsOnMap(currentUser.id);
       }, 10000);
     }
 
