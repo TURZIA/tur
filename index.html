@@ -1077,12 +1077,13 @@ const MIN_TRACK_METERS = 2;     // أضف للمسار فقط إذا تحركت 
 
 const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
 
+let _saveTrackTimer = null;
 function saveTrack() {
-  try {
-    // احفظ آخر 800 نقطة فقط
-    const pts = trackPoints.slice(-800);
-    localStorage.setItem(LS_TRACK, JSON.stringify(pts));
-  } catch {}
+  if (_saveTrackTimer) return;
+  _saveTrackTimer = setTimeout(() => {
+    _saveTrackTimer = null;
+    try { localStorage.setItem(LS_TRACK, JSON.stringify(trackPoints.slice(-800))); } catch {}
+  }, 5000);
 }
 
 function loadTrack() {
@@ -1587,14 +1588,23 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+let _nearestCache = null; // { lat, lng, checkpoint, distance }
 function findNearestCheckpoint(lat, lng) {
+  if (_nearestCache &&
+      Math.abs(_nearestCache.lat - lat) < 1e-6 &&
+      Math.abs(_nearestCache.lng - lng) < 1e-6) {
+    return { checkpoint: _nearestCache.checkpoint, distance: _nearestCache.distance };
+  }
   let nearest = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
     const d = haversineMeters(lat, lng, cp.lat, cp.lng);
     if (d < minDist) { minDist = d; nearest = cp; }
   });
+  _nearestCache = { lat, lng, checkpoint: nearest, distance: minDist };
   return { checkpoint: nearest, distance: minDist };
 }
+
+function _invalidateNearestCache() { _nearestCache = null; }
 
 /* ============================================================
    MAP ARROW — from blue dot to nearest unregistered checkpoint
@@ -1766,12 +1776,10 @@ function _updateCompassArrow() {
 
   if (_compassUserLat === null) { widget.classList.add('inactive'); return; }
 
-  const now = Date.now();
-  const cpTimes = getCpTimes();
+  // Use in-memory doneCheckpoints (no localStorage read needed)
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const t = cpTimes[cp.order];
-    if (t && (now - t) < COOLDOWN_MS) return;
+    if (doneCheckpoints.has(cp.order)) return;
     const d = haversineMeters(_compassUserLat, _compassUserLng, cp.lat, cp.lng);
     if (d < minDist) { minDist = d; target = cp; }
   });
@@ -2221,17 +2229,23 @@ async function onAuthSuccess(user, nameOverride) {
 
   const isSuperAdmin = user.email === CONFIG.ADMIN_EMAIL;
 
-  // Check admin status FIRST before touching runners table
-  let isAdmin = isSuperAdmin;
-  if (!isSuperAdmin) {
-    const { data: aRow } = await sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).single();
-    if (aRow) { isAdmin = true; adminOwnCode = aRow.admin_code; }
-  }
+  // Run admin + runner queries in parallel to save one round trip
+  const [adminQ, runnerQ] = await Promise.all([
+    isSuperAdmin
+      ? Promise.resolve({ data: null })
+      : sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).single(),
+    isSuperAdmin
+      ? Promise.resolve({ data: null })
+      : sbClient.from('runners').select('name,race_id,prev_race_id').eq('id', user.id).single(),
+  ]);
 
-  // Only check/clear runners link if user is NOT an admin
+  let isAdmin = isSuperAdmin;
+  if (!isSuperAdmin && adminQ.data) { isAdmin = true; adminOwnCode = adminQ.data.admin_code; }
+
+  // Only use runner result if user is NOT an admin
   if (!isAdmin) {
     try {
-      const { data } = await sbClient.from('runners').select('name,race_id,prev_race_id').eq('id', user.id).single();
+      const { data } = runnerQ;
       if (data?.name && !name) name = data.name;
       if (data?.race_id) {
         const { data: activeAdmin } = await sbClient.from('admins')
@@ -3276,9 +3290,6 @@ async function drawRaceRoute() {
   try { await _drawRaceRouteInner(); } finally { _drawingRoute = false; }
 }
 async function _drawRaceRouteInner() {
-  // Clear old cache formats
-  localStorage.removeItem('raceRoute_v1');
-  localStorage.removeItem(LS_RACE_ROUTE);
   const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
   if (cps.length < 2) return;
 
@@ -3321,6 +3332,7 @@ async function _drawRaceRouteInner() {
 
 function rebuildMapMarkers() {
   if (!leafletMap) return;
+  _invalidateNearestCache();
   Object.values(cpMarkers).forEach(m => leafletMap.removeLayer(m));
   Object.keys(cpMarkers).forEach(k => delete cpMarkers[k]);
   if (activePulseMarker) { leafletMap.removeLayer(activePulseMarker); activePulseMarker = null; }
@@ -3438,6 +3450,7 @@ function setupOfflineBanner() {
    INIT
    ============================================================ */
 async function init() {
+  localStorage.removeItem('raceRoute_v1'); // one-time old format cleanup
   injectManifest();
   initSupabase();
   setupPullToRefresh();
