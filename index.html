@@ -848,6 +848,15 @@
     <!-- نقاط السباق المختار -->
     <div id="cpAdminList"></div>
 
+    <!-- قائمة الراكضين المرتبطين بهذا الأدمن -->
+    <div class="rapport-card" style="margin-top:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="cpRunnersToggle">
+        <div class="rapport-card-title" style="margin-bottom:0;">Løpere</div>
+        <span id="cpRunnersChevron" style="font-size:1.1rem; color:var(--muted);">▼</span>
+      </div>
+      <div id="cpRunnersList" style="display:none; margin-top:12px;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -1096,11 +1105,12 @@ function initSupabase() {
   } catch(e) { console.error('Supabase init:', e); sbClient = null; }
 }
 
-async function saveRunnerToSupabase(id, name, raceId) {
+async function saveRunnerToSupabase(id, name, raceId, email) {
   if (!sbClient) return;
   try {
     const row = { id, name, created_at: new Date().toISOString() };
     if (raceId) row.race_id = raceId;
+    if (email) row.email = email;
     await sbClient.from('runners').upsert(
       row,
       { onConflict: 'id', ignoreDuplicates: false }
@@ -2066,7 +2076,7 @@ async function handleSignup() {
     });
     if (error) throw error;
     // Admins don't get saved to runners table — they have no race link
-    if (!isAdminSignup) await saveRunnerToSupabase(data.user.id, name, adminCode);
+    if (!isAdminSignup) await saveRunnerToSupabase(data.user.id, name, adminCode, email);
     await onAuthSuccess(data.user, name);
   } catch(e) {
     showToast('' + (e.message || 'Registrering feilet'), 't-error', 5000);
@@ -2690,6 +2700,36 @@ async function openCpAdminScreen() {
   showScreen('cpAdminScreen');
   await _loadCpRaceDropdown();
   await renderCpAdminList();
+  // Setup runners toggle
+  const toggle = document.getElementById('cpRunnersToggle');
+  toggle.onclick = async () => {
+    const list = document.getElementById('cpRunnersList');
+    const chevron = document.getElementById('cpRunnersChevron');
+    if (list.style.display === 'none') {
+      list.style.display = '';
+      chevron.textContent = '▲';
+      await loadAdminRunnersList();
+    } else {
+      list.style.display = 'none';
+      chevron.textContent = '▼';
+    }
+  };
+}
+
+async function loadAdminRunnersList() {
+  const list = document.getElementById('cpRunnersList');
+  if (!currentUser?.adminCode) { list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Ingen løpere funnet.</div>'; return; }
+  list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Laster…</div>';
+  const { data, error } = await sbClient.from('runners').select('name,email').eq('race_id', currentUser.adminCode).order('name');
+  if (error || !data || data.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Ingen løpere koblet til deg ennå.</div>';
+    return;
+  }
+  list.innerHTML = data.map(r => `
+    <div style="display:flex; flex-direction:column; padding:8px 0; border-bottom:1px solid var(--border);">
+      <span style="font-weight:600; font-size:0.92rem;">${escHtml(r.name)}</span>
+      <span style="font-size:0.8rem; color:var(--muted);">${escHtml(r.email)}</span>
+    </div>`).join('');
 }
 
 async function _loadCpRaceDropdown() {
@@ -3229,7 +3269,7 @@ async function handleLinkAdmin() {
     return;
   }
 
-  await saveRunnerToSupabase(currentUser.id, currentUser.name, code);
+  await saveRunnerToSupabase(currentUser.id, currentUser.name, code, currentUser.email);
   currentUser.adminCode = code;
   document.getElementById('linkAdminOverlay').style.display = 'none';
 
