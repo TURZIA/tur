@@ -2979,7 +2979,8 @@ async function _loadCpRaceDropdown() {
     opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})${activeTag}` : `${r.name}${activeTag}`;
     sel.appendChild(opt);
   });
-  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  // Super admin always starts with no selection to avoid showing all checkpoints
+  if (!isSuperAdmin && prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
 
   const _updateRaceInfo = async () => {
     const raceId = sel.value;
@@ -3245,7 +3246,7 @@ async function renderCpAdminList() {
       .select('*').eq('race_id', raceId)
       .order('cp_order', { ascending: true });
     if (!data || data.length === 0) {
-      el.innerHTML = '<div class="list-empty">Ingen sjekkpunkter lagt til ennå.</div>';
+      el.innerHTML = '<div class="list-empty">Ingen steder lagt til ennå.</div>';
       return;
     }
     el.innerHTML = data.map(cp => `
