@@ -1641,7 +1641,7 @@ function _drawStraightArrow(lat, lng, target, dist) {
 }
 
 async function _fetchOsrmRoute(lat, lng, target) {
-  const url = `https://router.project-osrm.org/route/v1/foot/`
+  const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/`
     + `${lng},${lat};${target.lng},${target.lat}`
     + `?overview=full&geometries=geojson&steps=false`;
   const ctrl = new AbortController();
@@ -3218,8 +3218,9 @@ async function drawRaceRoute() {
   try { await _drawRaceRouteInner(); } finally { _drawingRoute = false; }
 }
 async function _drawRaceRouteInner() {
-  // Slett også gammelt cache-format
+  // Clear old cache formats
   localStorage.removeItem('raceRoute_v1');
+  localStorage.removeItem(LS_RACE_ROUTE);
   const cps = [...CONFIG.CHECKPOINTS].sort((a, b) => a.order - b.order);
   if (cps.length < 2) return;
 
@@ -3239,7 +3240,7 @@ async function _drawRaceRouteInner() {
   const segments = [];
   for (let i = 0; i < cps.length - 1; i++) {
     const a = cps[i], b = cps[i + 1];
-    const url = `https://router.project-osrm.org/route/v1/foot/`
+    const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/`
       + `${a.lng},${a.lat};${b.lng},${b.lat}`
       + `?overview=full&geometries=geojson&steps=false`;
     try {
