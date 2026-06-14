@@ -2896,7 +2896,8 @@ async function _loadCpRaceDropdown() {
   const newRaceBtn = document.getElementById('cpNewRaceHeaderBtn');
   if (newRaceBtn) newRaceBtn.style.display = '';
 
-  let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
+  // Super admin sees all activated races; regular admin sees only their active race
+  let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).eq('is_current', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
   const { data: races } = await query;
 
@@ -2916,17 +2917,10 @@ async function _loadCpRaceDropdown() {
     const activateBtn = document.getElementById('cpActivateRaceBtn');
     const badge     = document.getElementById('cpRaceActiveBadge');
     if (raceId) {
-      info.style.display = isSuperAdmin ? 'none' : '';
-      badge.style.display = 'none';
-      if (activateBtn) {
-        activateBtn.onclick = async () => {
-          await activateRace(raceId, currentUser.adminCode);
-          badge.style.display = '';
-          badge.textContent   = '● Aktivt løp for løpere';
-        };
-      }
-      const { data: r } = await sbClient.from('races').select('is_current').eq('race_id', raceId).single();
-      if (r?.is_current && badge) { badge.style.display = ''; badge.textContent = '● Aktivt løp for løpere'; }
+      // Activate button only shown in Nytt løp now; here just show badge
+      info.style.display = 'none';
+      badge.style.display = '';
+      badge.textContent = '● Aktivt løp for løpere';
     } else {
       info.style.display = 'none';
       if (badge) badge.style.display = 'none';
@@ -3007,7 +3001,8 @@ async function renderNRRacesList() {
       <div class="input-label">Koordinater</div>
       <input type="text" id="nrCoords_${escHtml(race.race_id)}" placeholder="59.9510 10.7732" autocorrect="off" autocapitalize="off" inputmode="decimal" style="margin-bottom:10px;" />
       <button class="btn btn-green" style="padding:8px 0;" onclick="addCpToRace('${escHtml(race.race_id)}')">+ Legg til</button>
-      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;margin-top:10px;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett løp</button>`;
+      ${!isSuperAdmin ? `<button onclick="activateRaceNR('${escHtml(race.race_id)}')" style="width:100%;margin-top:10px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-size:0.88rem;font-weight:600;cursor:pointer;">✓ Aktiver for løpere</button>` : ''}
+      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;margin-top:8px;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett løp</button>`;
 
     body.appendChild(cpList);
     body.appendChild(addForm);
@@ -3119,9 +3114,15 @@ async function activateRace(raceId, adminCode) {
   if (!raceId || !adminCode) return;
   await sbClient.from('races').update({ is_current: false }).eq('admin_code', adminCode);
   await sbClient.from('races').update({ is_current: true  }).eq('race_id', raceId);
-  // Refresh resolved raceId for this session
   if (currentUser) currentUser.raceId = raceId;
   showToast('Løpet er aktivert for alle løpere', 't-success', 2500);
+}
+
+async function activateRaceNR(raceId) {
+  const { data: r } = await sbClient.from('races').select('admin_code').eq('race_id', raceId).single();
+  if (!r) return;
+  await activateRace(raceId, r.admin_code);
+  await renderNRRacesList();
 }
 
 async function deleteRace(raceId) {
