@@ -2898,7 +2898,7 @@ async function _loadCpRaceDropdown() {
   if (newRaceBtn) newRaceBtn.style.display = '';
 
   // Regular admin sees all their races; super admin sees all active races
-  let query = sbClient.from('races').select('race_id,name,admin_code').eq('is_active', true).order('created_at');
+  let query = sbClient.from('races').select('race_id,name,admin_code,is_current').eq('is_active', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
   else query = query.eq('is_current', true);
   const { data: races } = await query;
@@ -2908,7 +2908,8 @@ async function _loadCpRaceDropdown() {
   (races || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.race_id;
-    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})` : r.name;
+    const activeTag = r.is_current ? ' ● Aktivt' : '';
+    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})${activeTag}` : `${r.name}${activeTag}`;
     sel.appendChild(opt);
   });
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
