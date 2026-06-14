@@ -1064,6 +1064,7 @@ let positionMarker    = null;   // نقطة زرقاء
 let liveTrackLine     = null;   // خط المسار الحي
 let trackPoints       = [];     // نقاط المسار [[lat,lng],...]
 let cpMarkers         = {};     // { order: L.circleMarker }
+let doneCheckpoints   = new Set(); // checkpoint orders already registered in current race (from DB)
 let raceRouteLine     = null;   // unused — kept for compat
 let raceRouteSegments = [];     // L.polyline per segment
 const LS_RACE_ROUTE   = 'raceRoute_v2';
@@ -1420,9 +1421,13 @@ function updateMapPosition(lat, lng, accuracy) {
 
 // تحميل التسجيلات السابقة وتلوين نقاطها على الخريطة
 async function loadPreviousRegistrationsOnMap(runnerId) {
+  doneCheckpoints.clear();
   const history = await fetchRunnerHistory(runnerId);
   history.forEach(entry => {
-    if (entry.checkpoint_order) markCheckpointDone(entry.checkpoint_order, entry.race_id);
+    if (entry.checkpoint_order) {
+      markCheckpointDone(entry.checkpoint_order, entry.race_id);
+      doneCheckpoints.add(entry.checkpoint_order);
+    }
   });
 }
 
@@ -1450,7 +1455,7 @@ function updateRegisterButton(lat, lng) {
   const { checkpoint, distance } = findNearestCheckpoint(lat, lng);
 
   if (distance <= CONFIG.MAX_DISTANCE_METERS) {
-    if (cpOnCooldown(checkpoint.order)) {
+    if (cpOnCooldown(checkpoint.order) || doneCheckpoints.has(checkpoint.order)) {
       stopPulse();
       btn.className = 'btn btn-gray';
       btn.textContent = `✓ ${checkpoint.name} — allerede registrert`;
@@ -1952,7 +1957,7 @@ async function registerPosition() {
     }
 
     appendLocalLog(entry);
-    if (nearestCp) setCpTime(nearestCp.order);
+    if (nearestCp) { setCpTime(nearestCp.order); doneCheckpoints.add(nearestCp.order); }
 
     // تلوين النقطة على الخريطة
     if (nearestCp) markCheckpointDone(nearestCp.order, nearestCp.raceId);
@@ -2694,6 +2699,7 @@ function parseDMS(str) { return parseCoordsFromText(str); }
 
 async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
+  doneCheckpoints.clear();
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
 
   try {
