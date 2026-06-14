@@ -884,9 +884,13 @@
   <div class="rapport-body">
 
     <!-- إنشاء سباق جديد -->
-    <div class="rapport-card">
+    <div class="rapport-card" id="cpNRCreateCard">
       <div class="rapport-card-title">Nytt løp</div>
       <input type="text" id="cpNRName" placeholder="f.eks. Oslo Maraton" autocorrect="off" />
+      <div id="cpNRAdminCodeWrap" style="display:none; margin-top:10px;">
+        <div class="input-label">Arrangørkode (hvilken admin)</div>
+        <input type="text" id="cpNRAdminCode" placeholder="F.eks. ABC123" autocorrect="off" autocapitalize="characters" maxlength="6" />
+      </div>
       <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">+ Opprett løp</button>
     </div>
 
@@ -2949,9 +2953,8 @@ async function _loadCpRaceDropdown() {
 function openNewRaceScreen() {
   showScreen('cpNewRaceScreen');
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-  // Super admin can view/delete races but not create new ones
-  const createCard = document.querySelector('#cpNewRaceScreen .rapport-card');
-  if (createCard) createCard.style.display = isSuperAdmin ? 'none' : '';
+  document.getElementById('cpNRAdminCodeWrap').style.display = isSuperAdmin ? '' : 'none';
+  if (isSuperAdmin) document.getElementById('cpNRAdminCode').value = '';
   document.getElementById('cpNRName').value    = '';
   document.getElementById('cpNRName').disabled = false;
   document.getElementById('cpNRCreateBtn').disabled = false;
@@ -3080,7 +3083,14 @@ async function createRace() {
   const name = document.getElementById('cpNRName').value.trim();
   if (!name) { showToast('Skriv inn et løpsnavn', 't-warn'); return; }
 
-  const adminCode = currentUser?.adminCode;
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  let adminCode = currentUser?.adminCode;
+  if (isSuperAdmin) {
+    adminCode = (document.getElementById('cpNRAdminCode').value || '').trim().toUpperCase();
+    if (!adminCode) { showToast('Skriv inn arrangørkoden', 't-warn'); return; }
+    const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).eq('is_active', true).single();
+    if (!adminRow) { showToast('Ugyldig arrangørkode', 't-error'); return; }
+  }
   if (!adminCode) { showToast('Ingen admin-kode funnet', 't-error'); return; }
 
   const btn = document.getElementById('cpNRCreateBtn');
@@ -3099,6 +3109,7 @@ async function createRace() {
 
   document.getElementById('cpNRName').value    = '';
   document.getElementById('cpNRName').disabled = false;
+  if (document.getElementById('cpNRAdminCode')) document.getElementById('cpNRAdminCode').value = '';
   btn.disabled = false; btn.textContent = '+ Opprett løp';
   showToast(`"${name}" opprettet!`, 't-success', 2000);
   await renderNRRacesList();
