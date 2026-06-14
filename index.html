@@ -2571,10 +2571,21 @@ function parseDMS(str) { return parseCoordsFromText(str); }
 async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-  if (isSuperAdmin) { CONFIG.CHECKPOINTS = []; return; }
-  if (!adminCode) { CONFIG.CHECKPOINTS = []; return; }
 
   try {
+    if (isSuperAdmin) {
+      // Super admin sees all checkpoints from all active races
+      const { data, error } = await sbClient.from('checkpoints')
+        .select('*').order('cp_order', { ascending: true });
+      if (error || !data) { CONFIG.CHECKPOINTS = []; return; }
+      CONFIG.CHECKPOINTS = data.map(r => ({
+        id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
+      }));
+      return;
+    }
+
+    if (!adminCode) { CONFIG.CHECKPOINTS = []; return; }
+
     // Find the admin's currently active race
     const { data: activeRace } = await sbClient.from('races')
       .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).single();
