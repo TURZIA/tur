@@ -655,6 +655,8 @@
     #mapPickerSearch input{flex:1;padding:10px 14px;border:none;border-radius:12px 0 0 12px;font-size:0.9rem;box-shadow:0 2px 8px rgba(0,0,0,.25);outline:none;}
     #mapPickerSearch button{padding:10px 14px;border:none;border-radius:0 12px 12px 0;background:var(--green);color:#fff;font-size:0.9rem;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);}
     #mapPickerResults{position:absolute;top:52px;left:10px;right:10px;z-index:10002;background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.2);max-height:200px;overflow-y:auto;display:none;}
+    #mapPickerResults.has-more{mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);}
+    #mapPickerResults.scrolled-bottom{mask-image:none;-webkit-mask-image:none;}
     .picker-result{padding:12px 14px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.85rem;color:#333;}
     .picker-result:last-child{border-bottom:none;}
     .picker-result:active{background:var(--green-lt);}
@@ -4052,6 +4054,17 @@ async function searchMapPlace() {
         resultsEl.style.display = 'none';
       };
       resultsEl.appendChild(div);
+    });
+    // Show fade hint if list is scrollable
+    requestAnimationFrame(() => {
+      const hasMore = resultsEl.scrollHeight > resultsEl.clientHeight;
+      resultsEl.classList.toggle('has-more', hasMore);
+      resultsEl.classList.remove('scrolled-bottom');
+      resultsEl.onscroll = () => {
+        const atBottom = resultsEl.scrollTop + resultsEl.clientHeight >= resultsEl.scrollHeight - 10;
+        resultsEl.classList.toggle('has-more', !atBottom);
+        resultsEl.classList.toggle('scrolled-bottom', atBottom);
+      };
     });
   } catch(e) {
     console.error('Map search error:', e);
