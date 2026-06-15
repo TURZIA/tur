@@ -2071,7 +2071,7 @@ async function loadDrawerHistory() {
   const { data: winRows } = await sbClient
     .from('winners')
     .select('race_ids,month,year')
-    .eq('winner_name', runner.name);
+    .or(`winner_id.eq.${runner.id},winner_name.eq.${runner.name}`);
   const wonRaceSet = new Set();
   (winRows || []).forEach(w => {
     (w.race_ids || []).forEach(rid => wonRaceSet.add(rid));
@@ -2531,7 +2531,7 @@ async function checkWinnerNotification(runner) {
     const { data } = await sbClient
       .from('winners')
       .select('id,month,year')
-      .eq('winner_name', runner.name)
+      .or(`winner_id.eq.${runner.id},winner_name.eq.${runner.name}`)
       .order('drawn_at', { ascending: false })
       .limit(5);
     if (!data || data.length === 0) return;
@@ -2663,23 +2663,22 @@ function startRealtime(runner) {
     });
   }
 
-  // winners INSERT: notify runner if they won
-  if (!isAdmin) {
-    ch.on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'winners',
-    }, payload => {
-      if (payload.new?.winner_name === runner.name) {
-        const m = payload.new.month;
-        const y = payload.new.year;
-        const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
-        showToast(`Gratulerer! Du vant trekningen for ${monthNames[m-1]} ${y}!`, 't-success', 10000);
-        const lsKey = 'tur_winner_seen';
-        const seen = JSON.parse(localStorage.getItem(lsKey) || '[]');
-        if (!seen.includes(payload.new.id)) seen.push(payload.new.id);
-        localStorage.setItem(lsKey, JSON.stringify(seen));
-      }
-    });
-  }
+  // winners INSERT: notify runner if they won (match by id or name)
+  ch.on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'winners',
+  }, payload => {
+    const w = payload.new;
+    if (!w) return;
+    const isMe = (w.winner_id && w.winner_id === runner.id) || w.winner_name === runner.name;
+    if (!isMe) return;
+    const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+    showToast(`Gratulerer! Du vant trekningen for ${monthNames[w.month-1]} ${w.year}!`, 't-success', 10000);
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+    const lsKey = 'tur_winner_seen';
+    const seen = JSON.parse(localStorage.getItem(lsKey) || '[]');
+    if (!seen.includes(w.id)) seen.push(w.id);
+    localStorage.setItem(lsKey, JSON.stringify(seen));
+  });
 
   // admins UPDATE: notify runner if their admin is deactivated
   if (!isSuperAdmin && !isAdmin && adminCode) {
@@ -2842,7 +2841,7 @@ async function fetchRapportData() {
 
   let query = sbClient
     .from('check_ins')
-    .select('runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
+    .select('runner_id,runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
     .gte('timestamp', fra.toISOString())
     .lte('timestamp', til.toISOString())
     .order('timestamp', { ascending: true });
@@ -2999,12 +2998,14 @@ async function drawWinner() {
 
     const byRunner = {};
     const runnerRaces = {};
+    const runnerIds = {};
     data.forEach(row => {
       if (!row.runner_name) return;
       if (!byRunner[row.runner_name]) byRunner[row.runner_name] = new Set();
       if (row.checkpoint_order) byRunner[row.runner_name].add(row.checkpoint_order);
       if (!runnerRaces[row.runner_name]) runnerRaces[row.runner_name] = new Set();
       if (row.race_id) runnerRaces[row.runner_name].add(row.race_id);
+      if (row.runner_id) runnerIds[row.runner_name] = row.runner_id;
     });
 
     const eligible = Object.entries(byRunner)
@@ -3018,9 +3019,11 @@ async function drawWinner() {
 
     const winner = eligible[Math.floor(Math.random() * eligible.length)];
     const wonRaceIds = [...(runnerRaces[winner] || [])];
+    const winnerId = runnerIds[winner] || null;
 
-    await sbClient.from('winners').insert({
+    const { error: insertErr } = await sbClient.from('winners').insert({
       winner_name: winner,
+      winner_id: winnerId,
       admin_code: adminCode || '',
       race_ids: wonRaceIds,
       month, year,
@@ -3029,10 +3032,21 @@ async function drawWinner() {
       drawn_at: new Date().toISOString(),
     });
 
+    if (insertErr) {
+      if (insertErr.code === '23505') {
+        showToast('Det er allerede trukket en vinner for denne måneden', 't-warn', 5000);
+      } else {
+        showToast('Feil ved lagring: ' + insertErr.message, 't-error', 5000);
+      }
+      return;
+    }
+
     document.getElementById('winnerName').textContent = winner;
     document.getElementById('winnerDetails').textContent =
       `${eligible.length} deltaker${eligible.length !== 1 ? 'e' : ''} kvalifisert (besøkte alle ${totalCps} steder)\nPeriode: ${fraStr} → ${tilStr}`;
     resultEl.style.display = '';
+    btn.disabled = true;
+    btn.textContent = 'Allerede trukket';
 
   } catch(e) {
     showToast('' + (e.message || 'Feil'), 't-error', 5000);
