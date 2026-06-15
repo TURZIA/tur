@@ -1182,16 +1182,26 @@ function initSupabase() {
   } catch(e) { console.error('Supabase init:', e); sbClient = null; }
 }
 
-async function saveRunnerToSupabase(id, name, raceId, email) {
+async function saveRunnerToSupabase(id, name, adminCode, email) {
   if (!sbClient) return;
   try {
-    const row = { id, name, created_at: new Date().toISOString() };
-    if (raceId) row.race_id = raceId;
-    if (email) row.email = email;
-    await sbClient.from('runners').upsert(
-      row,
-      { onConflict: 'id', ignoreDuplicates: false }
-    );
+    // Check if runner already exists — never overwrite their race_id
+    const { data: existing } = await sbClient.from('runners').select('id,race_id').eq('id', id).maybeSingle();
+    if (existing) {
+      // Runner exists — only update name/email, never touch race_id
+      const updates = {};
+      if (name) updates.name = name;
+      if (email) updates.email = email;
+      if (Object.keys(updates).length > 0) {
+        await sbClient.from('runners').update(updates).eq('id', id);
+      }
+    } else {
+      // New runner — insert with admin code
+      const row = { id, name, created_at: new Date().toISOString() };
+      if (adminCode) row.race_id = adminCode;
+      if (email) row.email = email;
+      await sbClient.from('runners').insert(row);
+    }
   } catch(e) { console.warn('saveRunner:', e); }
 }
 
@@ -2369,10 +2379,10 @@ async function onAuthSuccess(user, nameOverride) {
   const [adminQ, runnerQ] = await Promise.all([
     isSuperAdmin
       ? Promise.resolve({ data: null })
-      : sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).single(),
+      : sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).maybeSingle(),
     isSuperAdmin
       ? Promise.resolve({ data: null })
-      : sbClient.from('runners').select('name,race_id,prev_race_id').eq('id', user.id).single(),
+      : sbClient.from('runners').select('name,race_id,prev_race_id').eq('id', user.id).maybeSingle(),
   ]);
 
   let isAdmin = isSuperAdmin;
@@ -2384,20 +2394,33 @@ async function onAuthSuccess(user, nameOverride) {
       const { data } = runnerQ;
       if (data?.name && !name) name = data.name;
       if (data?.race_id) {
-        const { data: activeAdmin } = await sbClient.from('admins')
-          .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).single();
-        if (activeAdmin) {
+        const { data: activeAdmin, error: adminErr } = await sbClient.from('admins')
+          .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).maybeSingle();
+        if (adminErr) {
+          // Network/DB error — keep existing link, don't disconnect
+          runnerAdminCode = data.race_id;
+        } else if (activeAdmin) {
           runnerAdminCode = data.race_id;
         } else {
-          // Admin deactivated — save prev and clear current link
-          await sbClient.from('runners').update({ race_id: null, prev_race_id: data.race_id }).eq('id', user.id);
+          // Admin confirmed deactivated — verify with a second check (admin exists but inactive)
+          const { data: anyAdmin, error: anyErr } = await sbClient.from('admins')
+            .select('admin_code').eq('admin_code', data.race_id).maybeSingle();
+          if (anyErr) {
+            // Network error — keep link to be safe
+            runnerAdminCode = data.race_id;
+          } else if (anyAdmin) {
+            // Admin exists but is deactivated — save prev and clear
+            await sbClient.from('runners').update({ race_id: null, prev_race_id: data.race_id }).eq('id', user.id);
+          } else {
+            // Admin code doesn't exist at all — keep link (could be data issue)
+            runnerAdminCode = data.race_id;
+          }
         }
       } else if (!data?.race_id && data?.prev_race_id) {
         // No current link — check if previous admin is back active
-        const { data: prevAdmin } = await sbClient.from('admins')
-          .select('admin_code').eq('admin_code', data.prev_race_id).eq('is_active', true).single();
-        if (prevAdmin) {
-          // Auto-restore link to previous admin
+        const { data: prevAdmin, error: prevErr } = await sbClient.from('admins')
+          .select('admin_code').eq('admin_code', data.prev_race_id).eq('is_active', true).maybeSingle();
+        if (!prevErr && prevAdmin) {
           await sbClient.from('runners').update({ race_id: data.prev_race_id }).eq('id', user.id);
           runnerAdminCode = data.prev_race_id;
         }
@@ -3149,7 +3172,8 @@ async function loadLøpereList() {
 
 async function removeRunner(runnerId) {
   if (!confirm('Fjerne denne deltakeren fra listen?')) return;
-  await sbClient.from('runners').update({ race_id: null }).eq('id', runnerId);
+  const { data: runner } = await sbClient.from('runners').select('race_id').eq('id', runnerId).maybeSingle();
+  await sbClient.from('runners').update({ race_id: null, prev_race_id: runner?.race_id || null }).eq('id', runnerId);
   await loadLøpereList();
 }
 
@@ -3860,9 +3884,8 @@ async function handleLinkAdmin() {
     return;
   }
 
-  await saveRunnerToSupabase(currentUser.id, currentUser.name, code, currentUser.email);
-  // Clear prev_race_id — runner has intentionally chosen a new admin
-  await sbClient.from('runners').update({ prev_race_id: null }).eq('id', currentUser.id);
+  // Explicitly set race_id — runner intentionally choosing a new admin
+  await sbClient.from('runners').update({ race_id: code, prev_race_id: null }).eq('id', currentUser.id);
   currentUser.adminCode = code;
   document.getElementById('linkAdminOverlay').style.display = 'none';
 
