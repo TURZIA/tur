@@ -3263,10 +3263,9 @@ async function _loadCpRaceDropdown() {
   const newRaceBtn = document.getElementById('cpNewRaceHeaderBtn');
   if (newRaceBtn) newRaceBtn.style.display = '';
 
-  // Regular admin sees all their races; super admin sees all active races
+  // Regular admin sees their races; super admin sees ALL races
   let query = sbClient.from('races').select('race_id,name,admin_code,is_current').eq('is_active', true).order('created_at');
   if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
-  else query = query.eq('is_current', true);
   const { data: races } = await query;
 
   const prev = sel.value;
