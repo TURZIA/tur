@@ -4079,9 +4079,9 @@ async function _searchKartverket(query) {
     if (!items.length) return null;
     const results = [];
     items.forEach(item => {
-      const sm = item.skrivemåter?.[0];
-      const entry = Array.isArray(sm) ? sm[0] : sm;
-      const name = entry?.skrivemåte || '';
+      const writings = item.skrivemåte || item.skrivemåter || [];
+      const first = Array.isArray(writings) ? writings[0] : writings;
+      const name = typeof first === 'string' ? first : first?.skrivemåte || '';
       if (!name) return;
       const type = item.navneobjekttype || '';
       const kommune = item.kommuner?.[0]?.kommunenavn || '';
