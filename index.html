@@ -922,11 +922,9 @@
         <div class="input-label">Arrangørkode (hvilken admin)</div>
         <input type="text" id="cpNRAdminCode" placeholder="F.eks. ABC123" autocorrect="off" autocapitalize="characters" maxlength="6" />
       </div>
-      <div class="input-label" style="margin-top:10px;">Koordinater</div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="cpNRCoords" placeholder="59.9510 10.7732" autocorrect="off" autocapitalize="off" inputmode="decimal" style="flex:1;margin:0;" />
-        <button type="button" id="cpNRMapBtn" style="background:var(--green-lt);border:1px solid var(--green);color:var(--green-dk);border-radius:10px;padding:8px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">📍 Kart</button>
-      </div>
+      <input type="hidden" id="cpNRCoords" />
+      <button type="button" id="cpNRMapBtn" style="width:100%;margin-top:10px;background:var(--green-lt);border:1px solid var(--green);color:var(--green-dk);border-radius:10px;padding:10px;font-size:0.88rem;font-weight:600;cursor:pointer;">Velg sted på kartet</button>
+      <div id="cpNRSelectedLocation" style="display:none;margin-top:8px;font-size:0.82rem;color:var(--green-dk);font-weight:600;text-align:center;"></div>
       <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">+ Opprett tur</button>
     </div>
 
@@ -3354,6 +3352,7 @@ function openNewRaceScreen() {
   if (isSuperAdmin) document.getElementById('cpNRAdminCode').value = '';
   document.getElementById('cpNRName').value = '';
   document.getElementById('cpNRCoords').value = '';
+  document.getElementById('cpNRSelectedLocation').style.display = 'none';
   document.getElementById('cpNRName').disabled = false;
   document.getElementById('cpNRCreateBtn').disabled = false;
   document.getElementById('cpNRCreateBtn').textContent = '+ Opprett tur';
@@ -3806,6 +3805,9 @@ async function init() {
     const existing = parseCoordsFromText(document.getElementById('cpNRCoords').value);
     openMapPicker((lat, lng) => {
       document.getElementById('cpNRCoords').value = `${lat.toFixed(6)} ${lng.toFixed(6)}`;
+      const locEl = document.getElementById('cpNRSelectedLocation');
+      locEl.textContent = `✓ ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      locEl.style.display = '';
     }, existing?.lat, existing?.lng);
   });
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
