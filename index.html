@@ -914,10 +914,16 @@
     <!-- إنشاء سباق جديد -->
     <div class="rapport-card" id="cpNRCreateCard">
       <div class="rapport-card-title">Ny tur</div>
-      <input type="text" id="cpNRName" placeholder="f.eks. Oslo Maraton" autocorrect="off" />
+      <div class="input-label">Turnavn</div>
+      <input type="text" id="cpNRName" placeholder="f.eks. Tjuvtrappa" autocorrect="off" />
       <div id="cpNRAdminCodeWrap" style="display:none; margin-top:10px;">
         <div class="input-label">Arrangørkode (hvilken admin)</div>
         <input type="text" id="cpNRAdminCode" placeholder="F.eks. ABC123" autocorrect="off" autocapitalize="characters" maxlength="6" />
+      </div>
+      <div class="input-label" style="margin-top:10px;">Koordinater</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="cpNRCoords" placeholder="59.9510 10.7732" autocorrect="off" autocapitalize="off" inputmode="decimal" style="flex:1;margin:0;" />
+        <button type="button" id="cpNRMapBtn" style="background:var(--green-lt);border:1px solid var(--green);color:var(--green-dk);border-radius:10px;padding:8px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">📍 Kart</button>
       </div>
       <button class="btn btn-green" id="cpNRCreateBtn" style="margin-top:12px;">+ Opprett tur</button>
     </div>
@@ -1732,7 +1738,7 @@ function updateProgressBadge() {
   const badge = document.getElementById('progressBadge');
   if (!badge) return;
   const total = CONFIG.CHECKPOINTS.length;
-  if (total === 0 || currentUser?.email === CONFIG.ADMIN_EMAIL) {
+  if (total === 0 || currentUser?.email?.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase()) {
     badge.style.display = 'none';
     return;
   }
@@ -3345,7 +3351,8 @@ function openNewRaceScreen() {
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   document.getElementById('cpNRAdminCodeWrap').style.display = isSuperAdmin ? '' : 'none';
   if (isSuperAdmin) document.getElementById('cpNRAdminCode').value = '';
-  document.getElementById('cpNRName').value    = '';
+  document.getElementById('cpNRName').value = '';
+  document.getElementById('cpNRCoords').value = '';
   document.getElementById('cpNRName').disabled = false;
   document.getElementById('cpNRCreateBtn').disabled = false;
   document.getElementById('cpNRCreateBtn').textContent = '+ Opprett tur';
@@ -3388,38 +3395,25 @@ async function renderNRRacesList() {
       </div>
       <span style="color:var(--muted);">▼</span>`;
 
-    // Body (checkpoints + add form)
+    // Body (destination info + actions)
     const body = document.createElement('div');
     body.style.display = 'none';
+    body.id = `nrBody_${race.race_id}`;
 
-    // Checkpoints list
-    const cpList = document.createElement('div');
-    cpList.id = `nrCpList_${race.race_id}`;
-
-    // Add checkpoint form
-    const addForm = document.createElement('div');
-    addForm.style.cssText = 'padding:12px 14px; border-top:1px solid var(--border); background:var(--bg);';
-    addForm.innerHTML = `
-      <div class="rapport-card-title" style="margin-bottom:8px;">Legg til sted</div>
-      <div class="input-label">Navn</div>
-      <input type="text" id="nrName_${escHtml(race.race_id)}" placeholder="f.eks. Toppen" autocorrect="off" style="margin-bottom:8px;" />
-      <div class="input-label">Koordinater</div>
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <input type="text" id="nrCoords_${escHtml(race.race_id)}" placeholder="59.9510 10.7732" autocorrect="off" autocapitalize="off" inputmode="decimal" style="flex:1;margin:0;" />
-        <button type="button" onclick="pickCoordsOnMap('${escHtml(race.race_id)}')" style="background:var(--green-lt);border:1px solid var(--green);color:var(--green-dk);border-radius:10px;padding:8px 12px;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;">📍 Kart</button>
-      </div>
-      <button class="btn btn-green" style="padding:8px 0;" onclick="addCpToRace('${escHtml(race.race_id)}')">+ Legg til</button>
-      ${!isSuperAdmin ? `<button onclick="activateRaceNR('${escHtml(race.race_id)}')" style="width:100%;margin-top:10px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-size:0.88rem;font-weight:600;cursor:pointer;">✓ Aktiver for deltakere</button>` : ''}
+    const actions = document.createElement('div');
+    actions.style.cssText = 'padding:12px 14px; background:var(--bg);';
+    actions.innerHTML = `
+      <div id="nrCpInfo_${escHtml(race.race_id)}" style="margin-bottom:10px;"></div>
+      ${!isSuperAdmin ? `<button onclick="activateRaceNR('${escHtml(race.race_id)}')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-size:0.88rem;font-weight:600;cursor:pointer;">✓ Aktiver for deltakere</button>` : ''}
       <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;margin-top:8px;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett tur</button>`;
 
-    body.appendChild(cpList);
-    body.appendChild(addForm);
+    body.appendChild(actions);
 
     header.addEventListener('click', async () => {
       const open = body.style.display !== 'none';
       body.style.display = open ? 'none' : '';
       header.querySelector('span').textContent = open ? '▼' : '▲';
-      if (!open) await loadNRCpList(race.race_id);
+      if (!open) await _loadRaceDestination(race.race_id);
     });
 
     card.appendChild(header);
@@ -3428,72 +3422,40 @@ async function renderNRRacesList() {
   }
 }
 
-async function loadNRCpList(raceId) {
-  const el = document.getElementById(`nrCpList_${raceId}`);
+async function _loadRaceDestination(raceId) {
+  const el = document.getElementById(`nrCpInfo_${raceId}`);
   if (!el) return;
-  el.innerHTML = '<div class="list-empty" style="padding:10px 14px;">Laster…</div>';
   const { data } = await sbClient.from('checkpoints')
-    .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
-  if (!data || data.length === 0) {
-    el.innerHTML = '<div class="list-empty" style="padding:10px 14px; border-bottom:1px solid var(--border);">Ingen sjekkpunkter ennå.</div>';
+    .select('*').eq('race_id', raceId).order('cp_order', { ascending: true }).limit(1);
+  const cp = data?.[0];
+  if (!cp) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Ingen destinasjon satt.</div>';
     return;
   }
-  el.innerHTML = data.map(cp => `
-    <div class="cp-admin-item" style="border-bottom:1px solid var(--border);">
-      <div class="cp-admin-num">${cp.cp_order}</div>
-      <div class="cp-admin-info">
-        <div class="cp-admin-name">${escHtml(cp.name)}</div>
-        <div class="cp-admin-coords">${cp.lat.toFixed(5)}, ${cp.lng.toFixed(5)}</div>
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--green-lt);display:flex;align-items:center;justify-content:center;font-size:1.1rem;">📍</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:0.95rem;">${escHtml(cp.name)}</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${cp.lat.toFixed(5)}, ${cp.lng.toFixed(5)}</div>
       </div>
-      <button class="cp-admin-del" onclick="deleteNRCp('${escHtml(cp.id)}','${escHtml(raceId)}')" title="Slett">✕</button>
-    </div>`).join('');
-}
-
-async function deleteNRCp(cpId, raceId) {
-  if (!confirm('Slett dette sjekkpunktet?')) return;
-  await sbClient.from('checkpoints').delete().eq('id', cpId);
-  await loadNRCpList(raceId);
-  await loadCheckpointsFromSupabase(currentUser?.adminCode);
-  rebuildMapMarkers(); drawRaceRoute();
-  await renderCpAdminList();
-}
-
-async function addCpToRace(raceId) {
-  const nameEl   = document.getElementById(`nrName_${raceId}`);
-  const coordsEl = document.getElementById(`nrCoords_${raceId}`);
-  const name = nameEl?.value.trim();
-  const coords = coordsEl?.value.trim();
-  if (!name)   { showToast('Skriv inn navn', 't-warn'); return; }
-  const pos = parseCoordsFromText(coords);
-  if (!pos)  { showToast('Ugyldig koordinater', 't-error'); return; }
-
-  const { data: ex } = await sbClient.from('checkpoints')
-    .select('cp_order').eq('race_id', raceId).order('cp_order', { ascending: false }).limit(1);
-  const nextOrder = ex && ex.length > 0 ? ex[0].cp_order + 1 : 1;
-
-  const { error } = await sbClient.from('checkpoints').insert({
-    race_id: raceId, cp_order: nextOrder, name, lat: pos.lat, lng: pos.lng,
-  });
-  if (error) { showToast('Feil: ' + error.message, 't-error'); return; }
-
-  nameEl.value = ''; coordsEl.value = '';
-  showToast(`${nextOrder}. ${name} — lagt til!`, 't-success', 1800);
-  await loadNRCpList(raceId);
-  await loadCheckpointsFromSupabase(currentUser?.adminCode);
-  rebuildMapMarkers(); drawRaceRoute();
-  await renderCpAdminList();
+    </div>`;
 }
 
 async function createRace() {
   const name = document.getElementById('cpNRName').value.trim();
   if (!name) { showToast('Skriv inn et turnavn', 't-warn'); return; }
 
+  const coords = document.getElementById('cpNRCoords').value.trim();
+  const pos = parseCoordsFromText(coords);
+  if (!pos) { showToast('Velg sted på kartet eller skriv koordinater', 't-error'); return; }
+
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   let adminCode = currentUser?.adminCode;
   if (isSuperAdmin) {
     adminCode = (document.getElementById('cpNRAdminCode').value || '').trim().toUpperCase();
     if (!adminCode) { showToast('Skriv inn arrangørkoden', 't-warn'); return; }
-    const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).eq('is_active', true).single();
+    const { data: adminRow } = await sbClient.from('admins').select('admin_code').eq('admin_code', adminCode).eq('is_active', true).maybeSingle();
     if (!adminRow) { showToast('Ugyldig arrangørkode', 't-error'); return; }
   }
   if (!adminCode) { showToast('Ingen admin-kode funnet', 't-error'); return; }
@@ -3512,8 +3474,12 @@ async function createRace() {
   const { error } = await sbClient.from('races').insert({ admin_code: adminCode, race_id, name });
   if (error) { showToast('Feil: ' + error.message, 't-error'); btn.disabled = false; return; }
 
-  document.getElementById('cpNRName').value    = '';
-  document.getElementById('cpNRName').disabled = false;
+  await sbClient.from('checkpoints').insert({
+    race_id, cp_order: 1, name, lat: pos.lat, lng: pos.lng,
+  });
+
+  document.getElementById('cpNRName').value = '';
+  document.getElementById('cpNRCoords').value = '';
   if (document.getElementById('cpNRAdminCode')) document.getElementById('cpNRAdminCode').value = '';
   btn.disabled = false; btn.textContent = '+ Opprett tur';
   showToast(`"${name}" opprettet!`, 't-success', 2000);
@@ -3835,6 +3801,12 @@ async function init() {
   document.getElementById('cpNewRaceBackBtn').addEventListener('click', () => openCpAdminScreen());
   document.getElementById('cpNRCreateBtn').addEventListener('click', createRace);
   document.getElementById('cpNRName').addEventListener('keydown', e => { if (e.key === 'Enter') createRace(); });
+  document.getElementById('cpNRMapBtn').addEventListener('click', () => {
+    const existing = parseCoordsFromText(document.getElementById('cpNRCoords').value);
+    openMapPicker((lat, lng) => {
+      document.getElementById('cpNRCoords').value = `${lat.toFixed(6)} ${lng.toFixed(6)}`;
+    }, existing?.lat, existing?.lng);
+  });
   document.getElementById('superAdminBtn').addEventListener('click', openSuperAdminScreen);
   document.getElementById('superAdminBackBtn').addEventListener('click', returnToMainScreen);
   document.getElementById('addAdminBtn').addEventListener('click', addAdmin);
