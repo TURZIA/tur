@@ -4079,9 +4079,10 @@ async function _searchKartverket(query) {
     if (!items.length) return null;
     const results = [];
     items.forEach(item => {
-      const name = item.skrivemåter?.[0]?.skrivemåte
-        || item.skrivemåte || item.stedsnavn || '';
-      if (!name) return;
+      const raw = item.skrivemåter?.[0]?.skrivemåte ?? item.skrivemåte ?? item.stedsnavn ?? '';
+      const name = typeof raw === 'string' ? raw
+        : raw?.langnavn || raw?.navn || raw?.skrivemåte || JSON.stringify(raw);
+      if (!name || name === '{}') return;
       const type = item.navneobjekttype || '';
       const kommune = item.kommuner?.[0]?.kommunenavn || '';
       const fylke = item.fylker?.[0]?.fylkesnavn || '';
