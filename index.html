@@ -2497,28 +2497,35 @@ function startRealtime(runner) {
     drawRaceRoute();
   });
 
-  // races UPDATE: runner detects when admin activates a new race
+  // races UPDATE: runner/admin detects when a race is activated or deactivated
   if (!isSuperAdmin && adminCode) {
     ch.on('postgres_changes', {
       event: 'UPDATE', schema: 'public', table: 'races',
     }, async payload => {
       if (payload.new?.admin_code !== adminCode) return;
-      if (payload.new?.is_current) {
-        if (currentUser) currentUser.raceId = payload.new.race_id;
+      const newRaceId = payload.new?.race_id;
+      const isCurrent = !!payload.new?.is_current;
+
+      if (isCurrent) {
+        // تفعيل رحلة جديدة
+        if (currentUser) currentUser.raceId = newRaceId;
         await loadCheckpointsFromSupabase(adminCode);
         rebuildMapMarkers();
         if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
         drawRaceRoute();
         showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
-      } else if (payload.old?.is_current && !payload.new?.is_current) {
-        if (currentUser?.raceId === payload.new.race_id) {
-          if (currentUser) currentUser.raceId = null;
-          CONFIG.CHECKPOINTS = [];
-          rebuildMapMarkers();
-          _clearRaceRoute();
-          _clearArrow();
-          showToast('Arrangøren har deaktivert turen', 't-warn', 3000);
-        }
+      } else if (currentUser?.raceId === newRaceId) {
+        // إلغاء تفعيل — انتظر قليلاً لأن التفعيل يرسل حدثين (false ثم true)
+        setTimeout(async () => {
+          if (currentUser?.raceId === newRaceId) {
+            currentUser.raceId = null;
+            CONFIG.CHECKPOINTS = [];
+            rebuildMapMarkers();
+            _clearRaceRoute();
+            _clearArrow();
+            showToast('Arrangøren har deaktivert turen', 't-warn', 3000);
+          }
+        }, 1500);
       }
     });
   }
