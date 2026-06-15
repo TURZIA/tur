@@ -2181,6 +2181,7 @@ async function registerPosition() {
     // تلوين النقطة على الخريطة
     if (nearestCp) markCheckpointDone(nearestCp.order, nearestCp.raceId);
     updateProgressBadge();
+    drawRaceRoute();
 
     const cpLabel = nearestCp ? ` — ${nearestCp.name}` : '';
     showToast(`Registrert!${cpLabel}`, 't-success');
@@ -2487,7 +2488,9 @@ function startRealtime(runner) {
     }, payload => {
       const row = payload.new;
       if (row.runner_id === runner.id && row.checkpoint_order) {
+        doneCheckpoints.add(row.checkpoint_order);
         markCheckpointDone(row.checkpoint_order, row.race_id);
+        drawRaceRoute();
       }
       if (document.getElementById('historyDrawer').classList.contains('open') &&
           row.runner_id === runner.id) {
@@ -3528,9 +3531,10 @@ function _clearRaceRoute() {
 
 function _drawSegments(cps, segments) {
   _clearRaceRoute();
-  const cpTimes = getCpTimes();
   segments.forEach((points, i) => {
     if (!points || points.length < 2) return;
+    // لا ترسم الخط إذا النقطة الأولى مكتملة (خضراء)
+    if (doneCheckpoints.has(cps[i].order)) return;
     const line = L.polyline(points, {
       color: '#C9A800', weight: 4, opacity: 0.78, dashArray: '10 6',
     }).addTo(leafletMap);
