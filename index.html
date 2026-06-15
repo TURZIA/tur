@@ -1717,7 +1717,9 @@ function findNearestCheckpoint(lat, lng) {
   }
   let nearest = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const d = haversineMeters(lat, lng, cp.lat, cp.lng);
+    const checkLat = cp.snapLat ?? cp.lat;
+    const checkLng = cp.snapLng ?? cp.lng;
+    const d = haversineMeters(lat, lng, checkLat, checkLng);
     if (d < minDist) { minDist = d; nearest = cp; }
   });
   _nearestCache = { lat, lng, checkpoint: nearest, distance: minDist };
@@ -3126,7 +3128,24 @@ async function loadCheckpointsFromSupabase(adminCode) {
     CONFIG.CHECKPOINTS = data.map(r => ({
       id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
     }));
+    await _snapCheckpointsToRoad();
   } catch(e) { console.warn('Checkpoint load:', e); }
+}
+
+async function _snapCheckpointsToRoad() {
+  await Promise.all(CONFIG.CHECKPOINTS.map(async cp => {
+    try {
+      const url = `https://routing.openstreetmap.de/routed-foot/nearest/v1/foot/${cp.lng},${cp.lat}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const json = await res.json();
+      const snap = json.waypoints?.[0]?.location;
+      if (snap) {
+        cp.snapLng = snap[0];
+        cp.snapLat = snap[1];
+      }
+    } catch(e) { /* keep original coords */ }
+  }));
 }
 
 function _cpAdminRaceId() {
