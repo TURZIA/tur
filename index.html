@@ -1640,7 +1640,7 @@ function checkProximityAlert(lat, lng) {
   if (!CONFIG.CHECKPOINTS.length) return;
 
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const dist = haversineMeters(lat, lng, cp.lat, cp.lng);
+    const dist = haversineMeters(lat, lng, cp.snapLat ?? cp.lat, cp.snapLng ?? cp.lng);
     const key  = `alert_${cp.order}`;
 
     // دخل المنطقة (50م) ولم يُنبَّه من قبل ولم يسجّل بعد
@@ -1785,12 +1785,14 @@ function _bearing(lat1, lng1, lat2, lng2) {
 }
 
 function _drawStraightArrow(lat, lng, target, dist) {
+  const tLat = target.snapLat ?? target.lat;
+  const tLng = target.snapLng ?? target.lng;
   const frac = Math.max(0, 1 - 18 / (dist || 1));
-  const tip = [lat + (target.lat - lat) * frac, lng + (target.lng - lng) * frac];
+  const tip = [lat + (tLat - lat) * frac, lng + (tLng - lng) * frac];
   arrowLine = L.polyline([[lat, lng], tip], {
     color: '#FF6B6B', weight: 3, opacity: 0.85, dashArray: '8 6',
   }).addTo(leafletMap);
-  _drawArrowHead(tip, _bearing(lat, lng, target.lat, target.lng));
+  _drawArrowHead(tip, _bearing(lat, lng, tLat, tLng));
 }
 
 async function _fetchSingleRoute(profileUrl, lng1, lat1, lng2, lat2) {
@@ -1811,7 +1813,9 @@ async function _fetchOsrmRoute(lat, lng, target, onFirstResult) {
   let bestCoords   = null;
 
   const tryRoute = async (profileUrl) => {
-    const result = await _fetchSingleRoute(profileUrl, lng, lat, target.lng, target.lat);
+    const tLng = target.snapLng ?? target.lng;
+    const tLat = target.snapLat ?? target.lat;
+    const result = await _fetchSingleRoute(profileUrl, lng, lat, tLng, tLat);
     if (!result) return;
     if (result.distance < bestDistance) {
       bestDistance = result.distance;
@@ -1836,8 +1840,10 @@ function updateCompass(lat, lng) {
 
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    if (doneCheckpoints.has(cp.order)) return; // already registered
-    const d = haversineMeters(lat, lng, cp.lat, cp.lng);
+    if (doneCheckpoints.has(cp.order)) return;
+    const cLat = cp.snapLat ?? cp.lat;
+    const cLng = cp.snapLng ?? cp.lng;
+    const d = haversineMeters(lat, lng, cLat, cLng);
     if (d < minDist) { minDist = d; target = cp; }
   });
 
@@ -1936,7 +1942,7 @@ function _updateCompassArrow() {
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
     if (doneCheckpoints.has(cp.order)) return;
-    const d = haversineMeters(_compassUserLat, _compassUserLng, cp.lat, cp.lng);
+    const d = haversineMeters(_compassUserLat, _compassUserLng, cp.snapLat ?? cp.lat, cp.snapLng ?? cp.lng);
     if (d < minDist) { minDist = d; target = cp; }
   });
 
@@ -1946,7 +1952,7 @@ function _updateCompassArrow() {
 
   // Prøv å følge veien — fallback til rett linje mot checkpoint
   const routeBearing = _routeBearingFromPosition(_compassUserLat, _compassUserLng);
-  const bearing = routeBearing ?? _bearing(_compassUserLat, _compassUserLng, target.lat, target.lng);
+  const bearing = routeBearing ?? _bearing(_compassUserLat, _compassUserLng, target.snapLat ?? target.lat, target.snapLng ?? target.lng);
 
   const rotate = _compassHeading !== null
     ? (bearing - _compassHeading + 360) % 360
@@ -3132,6 +3138,7 @@ async function loadCheckpointsFromSupabase(adminCode) {
 }
 
 async function _snapCheckpointsToRoad() {
+  const MAX_SNAP_METERS = 500;
   await Promise.all(CONFIG.CHECKPOINTS.map(async cp => {
     try {
       const url = `https://routing.openstreetmap.de/routed-foot/nearest/v1/foot/${cp.lng},${cp.lat}`;
@@ -3140,8 +3147,11 @@ async function _snapCheckpointsToRoad() {
       const json = await res.json();
       const snap = json.waypoints?.[0]?.location;
       if (snap) {
-        cp.snapLng = snap[0];
-        cp.snapLat = snap[1];
+        const d = haversineMeters(cp.lat, cp.lng, snap[1], snap[0]);
+        if (d <= MAX_SNAP_METERS) {
+          cp.snapLng = snap[0];
+          cp.snapLat = snap[1];
+        }
       }
     } catch(e) { /* keep original coords */ }
   }));
