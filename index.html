@@ -4044,46 +4044,74 @@ async function searchMapPlace() {
   resultsEl.style.display = '';
 
   try {
-    const url = `https://ws.geonorge.no/stedsnavn/v1/sted?sok=${encodeURIComponent(query)}&fuzzy=true&treffPerSide=8&side=1`;
-    const res = await fetch(url);
-    const json = await res.json();
-    const names = json.navn || [];
-
-    if (names.length === 0) {
+    const results = await _searchKartverket(query) || await _searchNominatim(query);
+    if (!results || results.length === 0) {
       resultsEl.innerHTML = '<div class="picker-result" style="color:#888;">Ingen treff</div>';
       return;
     }
-
     resultsEl.innerHTML = '';
-    names.forEach(item => {
-      const name = item.skrivemåte || item.navn || '';
-      const type = item.navneobjekttype || '';
-      const kommune = item.kommuner?.[0]?.kommunenavn || '';
-      const fylke = item.fylker?.[0]?.fylkesnavn || '';
-      const loc = kommune ? `${kommune}${fylke ? ', ' + fylke : ''}` : fylke;
-
-      let lat = null, lng = null;
-      if (item.representasjonspunkt) {
-        lat = item.representasjonspunkt.nord;
-        lng = item.representasjonspunkt.øst;
-      }
-      if (lat == null || lng == null) return;
-
+    results.forEach(r => {
       const div = document.createElement('div');
       div.className = 'picker-result';
-      div.innerHTML = `<div class="picker-result-name">${escHtml(name)}</div>` +
-        `<div class="picker-result-type">${escHtml(type)}${loc ? ' — ' + escHtml(loc) : ''}</div>`;
+      div.innerHTML = `<div class="picker-result-name">${escHtml(r.name)}</div>` +
+        `<div class="picker-result-type">${escHtml(r.detail)}</div>`;
       div.onclick = () => {
-        _pickerMap.setView([lat, lng], 17);
-        _pickerMarker.setLatLng([lat, lng]);
-        _updatePickerCoords(lat, lng);
+        _pickerMap.setView([r.lat, r.lng], 17);
+        _pickerMarker.setLatLng([r.lat, r.lng]);
+        _updatePickerCoords(r.lat, r.lng);
         resultsEl.style.display = 'none';
       };
       resultsEl.appendChild(div);
     });
   } catch(e) {
+    console.error('Map search error:', e);
     resultsEl.innerHTML = '<div class="picker-result" style="color:var(--red);">Søkefeil — prøv igjen</div>';
   }
+}
+
+async function _searchKartverket(query) {
+  try {
+    const url = `https://ws.geonorge.no/stedsnavn/v1/sted?sok=${encodeURIComponent(query)}&fuzzy=true&treffPerSide=8&side=1`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const items = json.navn || json.stedsnavn || [];
+    if (!items.length) return null;
+    const results = [];
+    items.forEach(item => {
+      const name = item.skrivemåter?.[0]?.skrivemåte
+        || item.skrivemåte || item.stedsnavn || '';
+      if (!name) return;
+      const type = item.navneobjekttype || '';
+      const kommune = item.kommuner?.[0]?.kommunenavn || '';
+      const fylke = item.fylker?.[0]?.fylkesnavn || '';
+      const detail = type + (kommune ? ' — ' + kommune : '') + (fylke ? ', ' + fylke : '');
+      const pt = item.representasjonspunkt;
+      if (!pt) return;
+      const lat = pt.nord ?? pt.lat;
+      const lng = pt.øst ?? pt.lon ?? pt.lng;
+      if (lat == null || lng == null) return;
+      results.push({ name, detail, lat: +lat, lng: +lng });
+    });
+    return results.length ? results : null;
+  } catch(e) { console.warn('Kartverket search failed:', e); return null; }
+}
+
+async function _searchNominatim(query) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=no&format=json&limit=8&addressdetails=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    return data.map(item => ({
+      name: item.name || item.display_name?.split(',')[0] || '',
+      detail: (item.type || '') + (item.address?.municipality ? ' — ' + item.address.municipality : '')
+        + (item.address?.county ? ', ' + item.address.county : ''),
+      lat: +item.lat,
+      lng: +item.lon,
+    }));
+  } catch(e) { console.warn('Nominatim search failed:', e); return null; }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
