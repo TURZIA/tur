@@ -2163,7 +2163,7 @@ async function registerPosition() {
 
     if (navigator.onLine && sbClient) {
       try {
-        await saveRunnerToSupabase(runner.id, runner.name, currentUser?.raceId || CONFIG.RACE_ID, currentUser?.email);
+        await saveRunnerToSupabase(runner.id, runner.name, currentUser?.adminCode, currentUser?.email);
         await saveCheckInToSupabase(entry);
       } catch(e) {
         const msg = e?.message || JSON.stringify(e) || 'ukjent';
@@ -2362,7 +2362,7 @@ async function onAuthSuccess(user, nameOverride) {
 
   if (!name) name = user.email?.split('@')[0] || '';
 
-  const isSuperAdmin = user.email === CONFIG.ADMIN_EMAIL;
+  const isSuperAdmin = user.email?.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
 
   // Run admin + runner queries in parallel to save one round trip
   const [adminQ, runnerQ] = await Promise.all([
@@ -2472,7 +2472,7 @@ function startRealtime(runner) {
   if (!sbClient) return;
   if (realtimeChannel) sbClient.removeChannel(realtimeChannel);
 
-  const isSuperAdmin = runner.email === CONFIG.ADMIN_EMAIL;
+  const isSuperAdmin = runner.email?.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
   const isAdmin      = isSuperAdmin || !!runner.adminCode;
   // raceId is the resolved race_id (set by loadCheckpointsFromSupabase); adminCode is the admin link
   const raceId    = runner.raceId    || null;
