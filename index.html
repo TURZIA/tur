@@ -1114,6 +1114,30 @@ const ANIM_LERP  = 0.18; // سرعة الانتقال: 0.08=ناعم جداً، 
 
 const LS_TRACK = 'loypesjekk_track'; // حفظ المسار
 
+// ── Auto-refresh system ──────────────────────────────
+let _pendingRefresh = false;
+let _lastFullRefresh = 0;
+
+function _flagPendingRefresh() {
+  _pendingRefresh = true;
+}
+
+async function _doFullRefresh() {
+  if (!currentUser) return;
+  _pendingRefresh = false;
+  _lastFullRefresh = Date.now();
+  const adminCode = currentUser.adminCode;
+  await loadCheckpointsFromSupabase(adminCode);
+  rebuildMapMarkers();
+  if (currentUser.raceId) {
+    drawRaceRoute();
+  } else {
+    _clearRaceRoute();
+    _clearArrow();
+  }
+  if (currentUser.id) await loadPreviousRegistrationsOnMap(currentUser.id);
+}
+
 let _saveTrackTimer = null;
 function saveTrack() {
   if (_saveTrackTimer) return;
@@ -2507,22 +2531,14 @@ function startRealtime(runner) {
       const isCurrent = !!payload.new?.is_current;
 
       if (isCurrent) {
-        // تفعيل رحلة جديدة
         if (currentUser) currentUser.raceId = newRaceId;
-        await loadCheckpointsFromSupabase(adminCode);
-        rebuildMapMarkers();
-        if (runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
-        drawRaceRoute();
+        await _doFullRefresh();
         showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
       } else if (currentUser?.raceId === newRaceId) {
-        // إلغاء تفعيل — انتظر قليلاً لأن التفعيل يرسل حدثين (false ثم true)
         setTimeout(async () => {
           if (currentUser?.raceId === newRaceId) {
             currentUser.raceId = null;
-            CONFIG.CHECKPOINTS = [];
-            rebuildMapMarkers();
-            _clearRaceRoute();
-            _clearArrow();
+            await _doFullRefresh();
             showToast('Arrangøren har deaktivert turen', 't-warn', 3000);
           }
         }, 1500);
@@ -2575,6 +2591,34 @@ function startRealtime(runner) {
   }
 
   realtimeChannel = ch.subscribe();
+
+  // ── Touch-to-refresh: عند لمس الشاشة يتحقق إذا في تحديث معلّق ──
+  document.addEventListener('touchstart', () => {
+    if (_pendingRefresh) _doFullRefresh();
+  }, { passive: true });
+  document.addEventListener('click', () => {
+    if (_pendingRefresh) _doFullRefresh();
+  });
+
+  // ── Periodic poll: كل 30 ثانية تحقق من حالة الرحلة النشطة ──
+  setInterval(async () => {
+    if (!currentUser || !adminCode || !sbClient) return;
+    try {
+      const { data: activeRace } = await sbClient.from('races')
+        .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).single();
+      const serverRaceId = activeRace?.race_id || null;
+      if (serverRaceId !== (currentUser.raceId || null)) {
+        currentUser.raceId = serverRaceId;
+        _flagPendingRefresh();
+        await _doFullRefresh();
+        if (serverRaceId) {
+          showToast('Tur oppdatert', 't-success', 2000);
+        } else {
+          showToast('Turen er deaktivert', 't-warn', 2000);
+        }
+      }
+    } catch(e) {}
+  }, 30000);
 }
 
 /* ============================================================
