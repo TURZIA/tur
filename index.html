@@ -2592,33 +2592,13 @@ function startRealtime(runner) {
 
   realtimeChannel = ch.subscribe();
 
-  // ── Touch-to-refresh: عند لمس الشاشة يتحقق إذا في تحديث معلّق ──
+  // عند لمس الشاشة يتحقق إذا في تحديث معلّق
   document.addEventListener('touchstart', () => {
     if (_pendingRefresh) _doFullRefresh();
   }, { passive: true });
   document.addEventListener('click', () => {
     if (_pendingRefresh) _doFullRefresh();
   });
-
-  // ── Periodic poll: كل 30 ثانية تحقق من حالة الرحلة النشطة ──
-  setInterval(async () => {
-    if (!currentUser || !adminCode || !sbClient) return;
-    try {
-      const { data: activeRace } = await sbClient.from('races')
-        .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).single();
-      const serverRaceId = activeRace?.race_id || null;
-      if (serverRaceId !== (currentUser.raceId || null)) {
-        currentUser.raceId = serverRaceId;
-        _flagPendingRefresh();
-        await _doFullRefresh();
-        if (serverRaceId) {
-          showToast('Tur oppdatert', 't-success', 2000);
-        } else {
-          showToast('Turen er deaktivert', 't-warn', 2000);
-        }
-      }
-    } catch(e) {}
-  }, 30000);
 }
 
 /* ============================================================
