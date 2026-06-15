@@ -2370,6 +2370,14 @@ async function handleSignup() {
       options: { data: { full_name: name } },
     });
     if (error) throw error;
+
+    // Check if email confirmation is required
+    if (data.user && !data.session) {
+      showToast('Sjekk e-posten din og klikk på bekreftelseslenken for å fullføre registreringen', 't-success', 8000);
+      showSigninForm();
+      return;
+    }
+
     // Admins don't get saved to runners table — they have no race link
     if (!isAdminSignup) await saveRunnerToSupabase(data.user.id, name, adminCode, email);
     await onAuthSuccess(data.user, name);
@@ -2410,7 +2418,11 @@ async function onAuthSuccess(user, nameOverride) {
     try {
       const { data } = runnerQ;
       if (data?.name && !name) name = data.name;
-      if (data?.race_id) {
+
+      if (!data) {
+        // Runner not in DB yet (e.g. after email confirmation) — create entry
+        await saveRunnerToSupabase(user.id, name, null, user.email);
+      } else if (data?.race_id) {
         const { data: activeAdmin, error: adminErr } = await sbClient.from('admins')
           .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).maybeSingle();
         if (adminErr) {
@@ -3888,7 +3900,12 @@ async function handleLinkAdmin() {
   }
 
   // Explicitly set race_id — runner intentionally choosing a new admin
-  await sbClient.from('runners').update({ race_id: code, prev_race_id: null }).eq('id', currentUser.id);
+  const { data: existingRunner } = await sbClient.from('runners').select('id').eq('id', currentUser.id).maybeSingle();
+  if (existingRunner) {
+    await sbClient.from('runners').update({ race_id: code, prev_race_id: null }).eq('id', currentUser.id);
+  } else {
+    await sbClient.from('runners').insert({ id: currentUser.id, name: currentUser.name, email: currentUser.email, race_id: code, created_at: new Date().toISOString() });
+  }
   currentUser.adminCode = code;
   document.getElementById('linkAdminOverlay').style.display = 'none';
 
