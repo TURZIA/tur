@@ -1389,9 +1389,10 @@ function initMap() {
 
 function drawCheckpointMarkers() {
   CONFIG.CHECKPOINTS.forEach(cp => {
+    const isDone = doneCheckpoints.has(cp.order);
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
-      fillColor: '#0EA371', fillOpacity: 1,
+      fillColor: isDone ? '#E24B4A' : '#0EA371', fillOpacity: 1,
     }).addTo(leafletMap);
     marker.bindTooltip(`${cp.order}. ${cp.name}`, { permanent: false, direction: 'top' });
     const key = cp.id || `${cp.raceId}_${cp.order}`;
@@ -3602,9 +3603,10 @@ function rebuildMapMarkers() {
   if (activePulseMarker) { leafletMap.removeLayer(activePulseMarker); activePulseMarker = null; }
   activePulseOrder = null; activePulseCp = null;
   CONFIG.CHECKPOINTS.forEach(cp => {
+    const isDone = doneCheckpoints.has(cp.order);
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
-      fillColor: '#0EA371', fillOpacity: 1,
+      fillColor: isDone ? '#E24B4A' : '#0EA371', fillOpacity: 1,
     }).addTo(leafletMap);
     marker.bindTooltip(`${cp.order}. ${cp.name}`, { permanent: false, direction: 'top' });
     cpMarkers[_cpKey(cp)] = marker;
