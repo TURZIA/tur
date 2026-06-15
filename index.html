@@ -4071,30 +4071,37 @@ async function searchMapPlace() {
 
 async function _searchKartverket(query) {
   try {
-    const url = `https://ws.geonorge.no/stedsnavn/v1/sted?sok=${encodeURIComponent(query)}&fuzzy=true&treffPerSide=8&side=1`;
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const items = json.navn || json.stedsnavn || [];
-    if (!items.length) return null;
-    const results = [];
-    items.forEach(item => {
-      const writings = item.skrivemåte || item.skrivemåter || [];
-      const first = Array.isArray(writings) ? writings[0] : writings;
-      const name = typeof first === 'string' ? first : first?.skrivemåte || '';
-      if (!name) return;
-      const type = item.navneobjekttype || '';
-      const kommune = item.kommuner?.[0]?.kommunenavn || '';
-      const fylke = item.fylker?.[0]?.fylkesnavn || '';
-      const detail = type + (kommune ? ' — ' + kommune : '') + (fylke ? ', ' + fylke : '');
-      const pt = item.representasjonspunkt;
-      if (!pt) return;
-      const lat = pt.nord ?? pt.lat;
-      const lng = pt.øst ?? pt.lon ?? pt.lng;
-      if (lat == null || lng == null) return;
-      results.push({ name, detail, lat: +lat, lng: +lng });
-    });
-    return results.length ? results : null;
+    // Try /navn endpoint first (finds small places, trails, etc.), then /sted
+    const endpoints = [
+      `https://ws.geonorge.no/stedsnavn/v1/navn?sok=${encodeURIComponent(query)}&fuzzy=true&treffPerSide=10&side=1`,
+      `https://ws.geonorge.no/stedsnavn/v1/sted?sok=${encodeURIComponent(query)}&fuzzy=true&treffPerSide=10&side=1`,
+    ];
+    for (const url of endpoints) {
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const items = json.navn || json.stedsnavn || [];
+      if (!items.length) continue;
+      const results = [];
+      items.forEach(item => {
+        const writings = item.skrivemåte || item.skrivemåter || [];
+        const first = Array.isArray(writings) ? writings[0] : writings;
+        const name = typeof first === 'string' ? first : first?.skrivemåte || '';
+        if (!name) return;
+        const type = item.navneobjekttype || '';
+        const kommune = item.kommuner?.[0]?.kommunenavn || '';
+        const fylke = item.fylker?.[0]?.fylkesnavn || '';
+        const detail = type + (kommune ? ' — ' + kommune : '') + (fylke ? ', ' + fylke : '');
+        const pt = item.representasjonspunkt;
+        if (!pt) return;
+        const lat = pt.nord ?? pt.lat;
+        const lng = pt.øst ?? pt.lon ?? pt.lng;
+        if (lat == null || lng == null) return;
+        results.push({ name, detail, lat: +lat, lng: +lng });
+      });
+      if (results.length) return results;
+    }
+    return null;
   } catch(e) { console.warn('Kartverket search failed:', e); return null; }
 }
 
