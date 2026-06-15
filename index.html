@@ -4041,7 +4041,7 @@ async function searchMapPlace() {
   if (!query) { resultsEl.style.display = 'none'; return; }
 
   resultsEl.innerHTML = '<div class="picker-result" style="color:#888;">Søker…</div>';
-  resultsEl.style.display = '';
+  resultsEl.style.display = 'block';
 
   try {
     const results = await _searchKartverket(query) || await _searchNominatim(query);
