@@ -2067,9 +2067,21 @@ async function loadDrawerHistory() {
   const raceNames = {};
   (raceRows || []).forEach(r => { raceNames[r.race_id] = r.name; });
 
+  // Fetch wins for this runner
+  const { data: winRows } = await sbClient
+    .from('winners')
+    .select('race_ids,month,year')
+    .eq('winner_name', runner.name);
+  const wonRaceSet = new Set();
+  (winRows || []).forEach(w => {
+    (w.race_ids || []).forEach(rid => wonRaceSet.add(rid));
+  });
+
   const totalEntries = history.length;
-  document.getElementById('drawerTotalCount').textContent =
-    `${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
+  const winCount = wonRaceSet.size;
+  let countText = `${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
+  if (winCount > 0) countText += ` · ${winCount} premie${winCount !== 1 ? 'r' : ''}`;
+  document.getElementById('drawerTotalCount').textContent = countText;
 
   const body = document.getElementById('drawerBody');
   body.innerHTML = '';
@@ -2078,6 +2090,7 @@ async function loadDrawerHistory() {
   raceIds.reverse().forEach(raceId => {
     const entries = byRace[raceId];
     const raceName = escHtml(raceNames[raceId] || 'Ukjent tur');
+    const isWon = wonRaceSet.has(raceId);
 
     entries.forEach(e => {
       const ts = new Date(e.timestamp);
@@ -2087,13 +2100,19 @@ async function loadDrawerHistory() {
 
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);';
+
+      const dotBg = isWon ? '#F5F3FF' : 'var(--green-lt)';
+      const dotColor = isWon ? '#6D28D9' : 'var(--green)';
+      const winBadge = isWon ? '<div style="font-size:0.7rem;color:#6D28D9;font-weight:700;margin-top:2px;">Vinner</div>' : '';
+
       row.innerHTML = `
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--green-lt);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <div style="width:10px;height:10px;border-radius:50%;background:var(--green);"></div>
+        <div style="width:36px;height:36px;border-radius:50%;background:${dotBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};"></div>
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:0.92rem;">${escHtml(cpName)}</div>
           <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">${raceName} · ${dateStr}, ${timeStr}</div>
+          ${winBadge}
         </div>`;
       body.appendChild(row);
     });
@@ -2500,7 +2519,30 @@ async function startMainScreen(runner) {
     startGPS();
     startRealtime(runner);
     drawRaceRoute();
+    checkWinnerNotification(runner);
   }, 150);
+}
+
+async function checkWinnerNotification(runner) {
+  if (!sbClient) return;
+  try {
+    const lsKey = 'tur_winner_seen';
+    const seen = JSON.parse(localStorage.getItem(lsKey) || '[]');
+    const { data } = await sbClient
+      .from('winners')
+      .select('id,month,year')
+      .eq('winner_name', runner.name)
+      .order('drawn_at', { ascending: false })
+      .limit(5);
+    if (!data || data.length === 0) return;
+    const unseen = data.filter(w => !seen.includes(w.id));
+    if (unseen.length === 0) return;
+    const w = unseen[0];
+    const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+    showToast(`Gratulerer! Du vant trekningen for ${monthNames[w.month-1]} ${w.year}!`, 't-success', 10000);
+    seen.push(...unseen.map(u => u.id));
+    localStorage.setItem(lsKey, JSON.stringify(seen));
+  } catch(e) { console.warn('checkWinner:', e); }
 }
 
 /* ============================================================
@@ -2618,6 +2660,24 @@ function startRealtime(runner) {
       const activeScreen = document.querySelector('.screen.active')?.id;
       if (activeScreen === 'cpAdminScreen') await renderCpAdminList();
       if (activeScreen === 'cpNewRaceScreen') await renderNRRacesList();
+    });
+  }
+
+  // winners INSERT: notify runner if they won
+  if (!isAdmin) {
+    ch.on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'winners',
+    }, payload => {
+      if (payload.new?.winner_name === runner.name) {
+        const m = payload.new.month;
+        const y = payload.new.year;
+        const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+        showToast(`Gratulerer! Du vant trekningen for ${monthNames[m-1]} ${y}!`, 't-success', 10000);
+        const lsKey = 'tur_winner_seen';
+        const seen = JSON.parse(localStorage.getItem(lsKey) || '[]');
+        if (!seen.includes(payload.new.id)) seen.push(payload.new.id);
+        localStorage.setItem(lsKey, JSON.stringify(seen));
+      }
     });
   }
 
@@ -2900,21 +2960,51 @@ async function drawWinner() {
   resultEl.style.display = 'none';
 
   try {
+    const fra = getDateFromSelects('fra');
+    const til = getDateFromSelects('til');
+    const fraStr = document.getElementById('fraDate').value;
+    const tilStr = document.getElementById('tilDate').value;
+    const month = fra.getMonth() + 1;
+    const year  = fra.getFullYear();
+
+    const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+    const selectedAdminCode = document.getElementById('adminSelect')?.value || null;
+    const selectedRaceId    = document.getElementById('rapportRaceSelect')?.value || null;
+    const adminCode = isSuperAdmin ? selectedAdminCode : (currentUser?.adminCode || null);
+
+    const { data: existing } = await sbClient
+      .from('winners')
+      .select('id,winner_name')
+      .eq('month', month)
+      .eq('year', year)
+      .eq('admin_code', adminCode || '')
+      .maybeSingle();
+
+    if (existing) {
+      document.getElementById('winnerName').textContent = existing.winner_name;
+      document.getElementById('winnerDetails').textContent = 'Allerede trukket for denne måneden';
+      resultEl.style.display = '';
+      showToast('Det er allerede trukket en vinner for denne måneden', 't-warn', 5000);
+      return;
+    }
+
     const result = await fetchRapportData();
     if (!result) return;
     const { data } = result;
     if (data.length === 0) { showToast('Ingen registreringer i perioden', 't-warn'); return; }
 
-    // Find participants who visited ALL unique checkpoints in the period
     const uniqueCps = new Set(data.map(r => r.checkpoint_order).filter(Boolean));
     const totalCps = uniqueCps.size;
     if (totalCps === 0) { showToast('Ingen sjekkpunkter funnet', 't-warn'); return; }
 
     const byRunner = {};
+    const runnerRaces = {};
     data.forEach(row => {
       if (!row.runner_name) return;
       if (!byRunner[row.runner_name]) byRunner[row.runner_name] = new Set();
       if (row.checkpoint_order) byRunner[row.runner_name].add(row.checkpoint_order);
+      if (!runnerRaces[row.runner_name]) runnerRaces[row.runner_name] = new Set();
+      if (row.race_id) runnerRaces[row.runner_name].add(row.race_id);
     });
 
     const eligible = Object.entries(byRunner)
@@ -2926,10 +3016,19 @@ async function drawWinner() {
       return;
     }
 
-    // Random pick
     const winner = eligible[Math.floor(Math.random() * eligible.length)];
-    const fraStr = document.getElementById('fraDate').value;
-    const tilStr = document.getElementById('tilDate').value;
+    const wonRaceIds = [...(runnerRaces[winner] || [])];
+
+    await sbClient.from('winners').insert({
+      winner_name: winner,
+      admin_code: adminCode || '',
+      race_ids: wonRaceIds,
+      month, year,
+      period_from: fra.toISOString(),
+      period_to: til.toISOString(),
+      drawn_at: new Date().toISOString(),
+    });
+
     document.getElementById('winnerName').textContent = winner;
     document.getElementById('winnerDetails').textContent =
       `${eligible.length} deltaker${eligible.length !== 1 ? 'e' : ''} kvalifisert (besøkte alle ${totalCps} steder)\nPeriode: ${fraStr} → ${tilStr}`;
