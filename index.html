@@ -2096,16 +2096,20 @@ function escHtml(str) {
 function openDrawer() {
   document.getElementById('drawerOverlay').classList.add('visible');
   document.getElementById('historyDrawer').classList.add('open');
-  document.getElementById('cpSearchWrap').style.display = 'none';
-  document.querySelector('.leaflet-control-zoom').style.display = 'none';
+  const sw = document.getElementById('cpSearchWrap');
+  const zc = document.querySelector('.leaflet-control-zoom');
+  if (sw) sw.style.display = 'none';
+  if (zc) zc.style.display = 'none';
   loadDrawerHistory();
 }
 
 function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('visible');
   document.getElementById('historyDrawer').classList.remove('open');
-  document.getElementById('cpSearchWrap').style.display = '';
-  document.querySelector('.leaflet-control-zoom').style.display = '';
+  const sw = document.getElementById('cpSearchWrap');
+  const zc = document.querySelector('.leaflet-control-zoom');
+  if (sw) sw.style.display = '';
+  if (zc) zc.style.display = '';
 }
 
 async function loadDrawerHistory() {
