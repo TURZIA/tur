@@ -3380,8 +3380,7 @@ async function _loadCpRaceDropdown() {
   (races || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.race_id;
-    const activeTag = r.is_current ? ' ● Aktivt' : '';
-    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})${activeTag}` : `${r.name}${activeTag}`;
+    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})` : r.name;
     sel.appendChild(opt);
   });
   // اختر الرحلة السابقة أو النشطة تلقائياً
@@ -3498,7 +3497,6 @@ async function renderNRRacesList() {
       <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:0.95rem;">${escHtml(race.name)}</div>
         ${adminInfo}
-        ${race.is_current ? '<div style="font-size:0.75rem;color:var(--green-dk);margin-top:2px;">● Aktivt</div>' : ''}
       </div>
       <span style="color:var(--muted);">▼</span>`;
 
