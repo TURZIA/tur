@@ -1106,7 +1106,9 @@ let positionMarker    = null;   // نقطة زرقاء
 let liveTrackLine     = null;   // خط المسار الحي
 let trackPoints       = [];     // نقاط المسار [[lat,lng],...]
 let cpMarkers         = {};     // { order: L.circleMarker }
-let doneCheckpoints   = new Set(); // checkpoint orders already registered in current race (from DB)
+let doneCheckpoints   = new Set(); // keys: "raceId_order"
+function _doneKey(raceId, order) { return `${raceId||''}_${order}`; }
+function _isDone(cp) { return doneCheckpoints.has(_doneKey(cp.raceId, cp.order)); }
 let raceRouteLine     = null;   // unused — kept for compat
 let raceRouteSegments = [];     // L.polyline per segment
 const LS_RACE_ROUTE   = 'raceRoute_v2';
@@ -1258,7 +1260,6 @@ async function fetchRunnerHistory(runnerId) {
       .from('check_ins')
       .select('checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, timestamp, elapsed_seconds, race_id')
       .eq('runner_id', runnerId)
-      .eq('race_id', currentUser?.raceId || '')
       .order('timestamp', { ascending: true });
     if (error) throw error;
     return data || [];
@@ -1414,7 +1415,7 @@ function initMap() {
 
 function drawCheckpointMarkers() {
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const isDone = doneCheckpoints.has(cp.order);
+    const isDone = _isDone(cp);
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
       fillColor: isDone ? '#E24B4A' : '#0EA371', fillOpacity: 1,
@@ -1588,7 +1589,7 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
     const doneToday = new Date(entry.timestamp).toDateString() === today;
     if (doneToday) {
       markCheckpointDone(Number(order), entry.race_id);
-      doneCheckpoints.add(Number(order));
+      doneCheckpoints.add(_doneKey(entry.race_id, Number(order)));
     }
   });
   updateProgressBadge();
@@ -1618,7 +1619,7 @@ function updateRegisterButton(lat, lng) {
   const { checkpoint, distance } = findNearestCheckpoint(lat, lng);
 
   if (distance <= CONFIG.MAX_DISTANCE_METERS) {
-    if (doneCheckpoints.has(checkpoint.order)) {
+    if (_isDone(checkpoint)) {
       stopPulse();
       btn.className = 'btn btn-gray';
       btn.textContent = `✓ ${checkpoint.name} — allerede registrert`;
@@ -1723,9 +1724,7 @@ function findNearestCheckpoint(lat, lng) {
   }
   let nearest = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const checkLat = cp.snapLat ?? cp.lat;
-    const checkLng = cp.snapLng ?? cp.lng;
-    const d = haversineMeters(lat, lng, checkLat, checkLng);
+    const d = haversineMeters(lat, lng, cp.lat, cp.lng);
     if (d < minDist) { minDist = d; nearest = cp; }
   });
   _nearestCache = { lat, lng, checkpoint: nearest, distance: minDist };
@@ -1785,12 +1784,14 @@ function _bearing(lat1, lng1, lat2, lng2) {
 }
 
 function _drawStraightArrow(lat, lng, target, dist) {
+  const tLat = target.snapLat ?? target.lat;
+  const tLng = target.snapLng ?? target.lng;
   const frac = Math.max(0, 1 - 18 / (dist || 1));
-  const tip = [lat + (target.lat - lat) * frac, lng + (target.lng - lng) * frac];
+  const tip = [lat + (tLat - lat) * frac, lng + (tLng - lng) * frac];
   arrowLine = L.polyline([[lat, lng], tip], {
     color: '#FF6B6B', weight: 3, opacity: 0.85, dashArray: '8 6',
   }).addTo(leafletMap);
-  _drawArrowHead(tip, _bearing(lat, lng, target.lat, target.lng));
+  _drawArrowHead(tip, _bearing(lat, lng, tLat, tLng));
 }
 
 async function _fetchSingleRoute(profileUrl, lng1, lat1, lng2, lat2) {
@@ -1811,7 +1812,9 @@ async function _fetchOsrmRoute(lat, lng, target, onFirstResult) {
   let bestCoords   = null;
 
   const tryRoute = async (profileUrl) => {
-    const result = await _fetchSingleRoute(profileUrl, lng, lat, target.lng, target.lat);
+    const tLng = target.snapLng ?? target.lng;
+    const tLat = target.snapLat ?? target.lat;
+    const result = await _fetchSingleRoute(profileUrl, lng, lat, tLng, tLat);
     if (!result) return;
     if (result.distance < bestDistance) {
       bestDistance = result.distance;
@@ -1836,7 +1839,7 @@ function updateCompass(lat, lng) {
 
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    if (doneCheckpoints.has(cp.order)) return; // already registered
+    if (_isDone(cp)) return;
     const d = haversineMeters(lat, lng, cp.lat, cp.lng);
     if (d < minDist) { minDist = d; target = cp; }
   });
@@ -1866,11 +1869,11 @@ function updateCompass(lat, lng) {
 
   _osrmTimer = setTimeout(async () => {
     if (_osrmTarget?.order !== target.order) return;
-    if (doneCheckpoints.has(target.order)) return;
+    if (_isDone(target)) return;
 
     const drawRoute = (coords) => {
       if (_osrmTarget?.order !== target.order) return;
-      if (doneCheckpoints.has(target.order)) return;
+      if (_isDone(target)) return;
       if (!coords || coords.length < 2) return;
       _clearArrow();
       arrowLine = L.polyline(coords, {
@@ -1935,7 +1938,7 @@ function _updateCompassArrow() {
   // Use in-memory doneCheckpoints (no localStorage read needed)
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    if (doneCheckpoints.has(cp.order)) return;
+    if (_isDone(cp)) return;
     const d = haversineMeters(_compassUserLat, _compassUserLng, cp.lat, cp.lng);
     if (d < minDist) { minDist = d; target = cp; }
   });
@@ -2061,9 +2064,21 @@ async function loadDrawerHistory() {
   const raceNames = {};
   (raceRows || []).forEach(r => { raceNames[r.race_id] = r.name; });
 
+  // Fetch wins for this runner
+  const { data: winRows } = await sbClient
+    .from('winners')
+    .select('race_ids,month,year')
+    .or(`winner_id.eq.${runner.id},winner_name.eq.${runner.name}`);
+  const wonRaceSet = new Set();
+  (winRows || []).forEach(w => {
+    (w.race_ids || []).forEach(rid => wonRaceSet.add(rid));
+  });
+
   const totalEntries = history.length;
-  document.getElementById('drawerTotalCount').textContent =
-    `${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
+  const winCount = wonRaceSet.size;
+  let countText = `${totalEntries} registrering${totalEntries !== 1 ? 'er' : ''}`;
+  if (winCount > 0) countText += ` · ${winCount} premie${winCount !== 1 ? 'r' : ''}`;
+  document.getElementById('drawerTotalCount').textContent = countText;
 
   const body = document.getElementById('drawerBody');
   body.innerHTML = '';
@@ -2072,6 +2087,7 @@ async function loadDrawerHistory() {
   raceIds.reverse().forEach(raceId => {
     const entries = byRace[raceId];
     const raceName = escHtml(raceNames[raceId] || 'Ukjent tur');
+    const isWon = wonRaceSet.has(raceId);
 
     entries.forEach(e => {
       const ts = new Date(e.timestamp);
@@ -2081,13 +2097,19 @@ async function loadDrawerHistory() {
 
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);';
+
+      const dotBg = isWon ? '#F5F3FF' : 'var(--green-lt)';
+      const dotColor = isWon ? '#6D28D9' : 'var(--green)';
+      const winBadge = isWon ? '<div style="font-size:0.7rem;color:#6D28D9;font-weight:700;margin-top:2px;">Vinner</div>' : '';
+
       row.innerHTML = `
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--green-lt);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <div style="width:10px;height:10px;border-radius:50%;background:var(--green);"></div>
+        <div style="width:36px;height:36px;border-radius:50%;background:${dotBg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};"></div>
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:700;font-size:0.92rem;">${escHtml(cpName)}</div>
           <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">${raceName} · ${dateStr}, ${timeStr}</div>
+          ${winBadge}
         </div>`;
       body.appendChild(row);
     });
@@ -2143,7 +2165,7 @@ async function registerPosition() {
       return;
     }
 
-    if (nearestCp && doneCheckpoints.has(nearestCp.order)) {
+    if (nearestCp && _isDone(nearestCp)) {
       showToast(`${nearestCp.name} er allerede registrert`, 't-warn', 3000);
       return;
     }
@@ -2185,7 +2207,7 @@ async function registerPosition() {
     }
 
     appendLocalLog(entry);
-    if (nearestCp) { setCpTime(nearestCp.order); doneCheckpoints.add(nearestCp.order); }
+    if (nearestCp) { setCpTime(nearestCp.order); doneCheckpoints.add(_doneKey(nearestCp.raceId, nearestCp.order)); }
 
     // تلوين النقطة على الخريطة
     if (nearestCp) markCheckpointDone(nearestCp.order, nearestCp.raceId);
@@ -2196,8 +2218,7 @@ async function registerPosition() {
     showToast(`Registrert!${cpLabel}`, 't-success');
 
     // Check if all checkpoints are now done
-    const allOrders = CONFIG.CHECKPOINTS.map(cp => cp.order);
-    if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
+    if (CONFIG.CHECKPOINTS.length > 0 && CONFIG.CHECKPOINTS.every(cp => _isDone(cp))) {
       setTimeout(() => showToast('Gratulerer! Du har besøkt alle steder i dag! 🎉', 't-success', 8000), 1500);
     }
 
@@ -2494,7 +2515,30 @@ async function startMainScreen(runner) {
     startGPS();
     startRealtime(runner);
     drawRaceRoute();
+    checkWinnerNotification(runner);
   }, 150);
+}
+
+async function checkWinnerNotification(runner) {
+  if (!sbClient) return;
+  try {
+    const lsKey = 'tur_winner_seen';
+    const seen = JSON.parse(localStorage.getItem(lsKey) || '[]');
+    const { data } = await sbClient
+      .from('winners')
+      .select('id,month,year')
+      .or(`winner_id.eq.${runner.id},winner_name.eq.${runner.name}`)
+      .order('drawn_at', { ascending: false })
+      .limit(5);
+    if (!data || data.length === 0) return;
+    const unseen = data.filter(w => !seen.includes(w.id));
+    if (unseen.length === 0) return;
+    const w = unseen[0];
+    const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+    showToast(`Gratulerer! Du vant trekningen for ${monthNames[w.month-1]} ${w.year}!`, 't-success', 10000);
+    seen.push(...unseen.map(u => u.id));
+    localStorage.setItem(lsKey, JSON.stringify(seen));
+  } catch(e) { console.warn('checkWinner:', e); }
 }
 
 /* ============================================================
@@ -2514,40 +2558,33 @@ function startRealtime(runner) {
 
   const ch = sbClient.channel('live-updates');
 
-  // check_ins: only for runners who have a resolved race
-  if (!isSuperAdmin && raceId) {
+  // check_ins: listen for own check-ins
+  if (!isSuperAdmin) {
     ch.on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'check_ins',
-      filter: `race_id=eq.${raceId}`,
+      filter: `runner_id=eq.${runner.id}`,
     }, payload => {
       const row = payload.new;
-      if (row.runner_id === runner.id && row.checkpoint_order) {
-        doneCheckpoints.add(row.checkpoint_order);
+      if (row.checkpoint_order) {
+        doneCheckpoints.add(_doneKey(row.race_id, row.checkpoint_order));
         markCheckpointDone(row.checkpoint_order, row.race_id);
         drawRaceRoute();
       }
-      if (document.getElementById('historyDrawer').classList.contains('open') &&
-          row.runner_id === runner.id) {
+      if (document.getElementById('historyDrawer').classList.contains('open')) {
         loadDrawerHistory();
       }
     });
   }
 
-  // checkpoints INSERT — super admin listens to all; runner/admin filter by their race
-  const cpInsertOpts = isSuperAdmin
-    ? { event: 'INSERT', schema: 'public', table: 'checkpoints' }
-    : raceId
-      ? { event: 'INSERT', schema: 'public', table: 'checkpoints', filter: `race_id=eq.${raceId}` }
-      : null; // no active race yet — skip
-
-  if (cpInsertOpts) {
-    ch.on('postgres_changes', cpInsertOpts, async () => {
-      await loadCheckpointsFromSupabase(adminCode);
-      rebuildMapMarkers();
-      if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
-      drawRaceRoute();
-    });
-  }
+  // checkpoints INSERT/UPDATE — everyone listens to all checkpoints
+  ch.on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'checkpoints',
+  }, async () => {
+    await loadCheckpointsFromSupabase(adminCode);
+    rebuildMapMarkers();
+    if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
+    drawRaceRoute();
+  });
 
   ch.on('postgres_changes', {
     event: 'DELETE', schema: 'public', table: 'checkpoints',
@@ -2558,27 +2595,22 @@ function startRealtime(runner) {
     drawRaceRoute();
   });
 
-  // races UPDATE: runner/admin detects when a race is activated or deactivated
-  if (!isSuperAdmin && adminCode) {
+  // races UPDATE: refresh all checkpoints when any race is activated/deactivated
+  if (!isSuperAdmin) {
     ch.on('postgres_changes', {
       event: 'UPDATE', schema: 'public', table: 'races',
     }, async payload => {
-      if (payload.new?.admin_code !== adminCode) return;
+      const isOwnAdmin = payload.new?.admin_code === adminCode;
       const newRaceId = payload.new?.race_id;
       const isCurrent = !!payload.new?.is_current;
+      const isActive = !!payload.new?.is_active;
 
-      if (isCurrent) {
+      if (isOwnAdmin && isCurrent && isActive) {
         if (currentUser) currentUser.raceId = newRaceId;
-        await _doFullRefresh();
-        showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
-      } else if (currentUser?.raceId === newRaceId) {
-        setTimeout(async () => {
-          if (currentUser?.raceId === newRaceId) {
-            currentUser.raceId = null;
-            await _doFullRefresh();
-            showToast('Arrangøren har deaktivert turen', 't-warn', 3000);
-          }
-        }, 1500);
+      }
+      await _doFullRefresh();
+      if (isCurrent && isActive) {
+        showToast('En ny tur er aktivert', 't-success', 3000);
       }
     });
   }
@@ -2614,6 +2646,23 @@ function startRealtime(runner) {
       if (activeScreen === 'cpNewRaceScreen') await renderNRRacesList();
     });
   }
+
+  // winners INSERT: notify runner if they won (match by id or name)
+  ch.on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'winners',
+  }, payload => {
+    const w = payload.new;
+    if (!w) return;
+    const isMe = (w.winner_id && w.winner_id === runner.id) || w.winner_name === runner.name;
+    if (!isMe) return;
+    const monthNames = ['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+    showToast(`Gratulerer! Du vant trekningen for ${monthNames[w.month-1]} ${w.year}!`, 't-success', 10000);
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+    const lsKey = 'tur_winner_seen';
+    const seen = JSON.parse(localStorage.getItem(lsKey) || '[]');
+    if (!seen.includes(w.id)) seen.push(w.id);
+    localStorage.setItem(lsKey, JSON.stringify(seen));
+  });
 
   // admins UPDATE: notify runner if their admin is deactivated
   if (!isSuperAdmin && !isAdmin && adminCode) {
@@ -2776,7 +2825,7 @@ async function fetchRapportData() {
 
   let query = sbClient
     .from('check_ins')
-    .select('runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
+    .select('runner_id,runner_name,checkpoint_name,checkpoint_order,lat_recorded,lng_recorded,accuracy_meters,elapsed_seconds,timestamp,race_id')
     .gte('timestamp', fra.toISOString())
     .lte('timestamp', til.toISOString())
     .order('timestamp', { ascending: true });
@@ -2894,21 +2943,53 @@ async function drawWinner() {
   resultEl.style.display = 'none';
 
   try {
+    const fra = getDateFromSelects('fra');
+    const til = getDateFromSelects('til');
+    const fraStr = document.getElementById('fraDate').value;
+    const tilStr = document.getElementById('tilDate').value;
+    const month = fra.getMonth() + 1;
+    const year  = fra.getFullYear();
+
+    const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+    const selectedAdminCode = document.getElementById('adminSelect')?.value || null;
+    const selectedRaceId    = document.getElementById('rapportRaceSelect')?.value || null;
+    const adminCode = isSuperAdmin ? selectedAdminCode : (currentUser?.adminCode || null);
+
+    const { data: existing } = await sbClient
+      .from('winners')
+      .select('id,winner_name')
+      .eq('month', month)
+      .eq('year', year)
+      .eq('admin_code', adminCode || '')
+      .maybeSingle();
+
+    if (existing) {
+      document.getElementById('winnerName').textContent = existing.winner_name;
+      document.getElementById('winnerDetails').textContent = 'Allerede trukket for denne måneden';
+      resultEl.style.display = '';
+      showToast('Det er allerede trukket en vinner for denne måneden', 't-warn', 5000);
+      return;
+    }
+
     const result = await fetchRapportData();
     if (!result) return;
     const { data } = result;
     if (data.length === 0) { showToast('Ingen registreringer i perioden', 't-warn'); return; }
 
-    // Find participants who visited ALL unique checkpoints in the period
     const uniqueCps = new Set(data.map(r => r.checkpoint_order).filter(Boolean));
     const totalCps = uniqueCps.size;
     if (totalCps === 0) { showToast('Ingen sjekkpunkter funnet', 't-warn'); return; }
 
     const byRunner = {};
+    const runnerRaces = {};
+    const runnerIds = {};
     data.forEach(row => {
       if (!row.runner_name) return;
       if (!byRunner[row.runner_name]) byRunner[row.runner_name] = new Set();
       if (row.checkpoint_order) byRunner[row.runner_name].add(row.checkpoint_order);
+      if (!runnerRaces[row.runner_name]) runnerRaces[row.runner_name] = new Set();
+      if (row.race_id) runnerRaces[row.runner_name].add(row.race_id);
+      if (row.runner_id) runnerIds[row.runner_name] = row.runner_id;
     });
 
     const eligible = Object.entries(byRunner)
@@ -2920,14 +3001,36 @@ async function drawWinner() {
       return;
     }
 
-    // Random pick
     const winner = eligible[Math.floor(Math.random() * eligible.length)];
-    const fraStr = document.getElementById('fraDate').value;
-    const tilStr = document.getElementById('tilDate').value;
+    const wonRaceIds = [...(runnerRaces[winner] || [])];
+    const winnerId = runnerIds[winner] || null;
+
+    const { error: insertErr } = await sbClient.from('winners').insert({
+      winner_name: winner,
+      winner_id: winnerId,
+      admin_code: adminCode || '',
+      race_ids: wonRaceIds,
+      month, year,
+      period_from: fra.toISOString(),
+      period_to: til.toISOString(),
+      drawn_at: new Date().toISOString(),
+    });
+
+    if (insertErr) {
+      if (insertErr.code === '23505') {
+        showToast('Det er allerede trukket en vinner for denne måneden', 't-warn', 5000);
+      } else {
+        showToast('Feil ved lagring: ' + insertErr.message, 't-error', 5000);
+      }
+      return;
+    }
+
     document.getElementById('winnerName').textContent = winner;
     document.getElementById('winnerDetails').textContent =
       `${eligible.length} deltaker${eligible.length !== 1 ? 'e' : ''} kvalifisert (besøkte alle ${totalCps} steder)\nPeriode: ${fraStr} → ${tilStr}`;
     resultEl.style.display = '';
+    btn.disabled = true;
+    btn.textContent = 'Allerede trukket';
 
   } catch(e) {
     showToast('' + (e.message || 'Feil'), 't-error', 5000);
@@ -3097,32 +3200,35 @@ async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
   doneCheckpoints.clear();
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  const isAdmin = isSuperAdmin || !!adminCode;
 
   try {
     if (isSuperAdmin) {
-      // Super admin sees all checkpoints from all active races
       const { data, error } = await sbClient.from('checkpoints')
         .select('*').order('cp_order', { ascending: true });
       if (error || !data) { CONFIG.CHECKPOINTS = []; return; }
       CONFIG.CHECKPOINTS = data.map(r => ({
         id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
       }));
+      await _snapCheckpointsToRoad();
       return;
     }
 
-    if (!adminCode) { CONFIG.CHECKPOINTS = []; return; }
+    // Resolve the user's own raceId for check-in recording
+    if (adminCode && currentUser) {
+      const { data: activeRace } = await sbClient.from('races')
+        .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).maybeSingle();
+      if (activeRace) currentUser.raceId = activeRace.race_id;
+    }
 
-    // Find the admin's currently active race
-    const { data: activeRace } = await sbClient.from('races')
-      .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).single();
-    const raceId = activeRace?.race_id;
-    if (!raceId) { CONFIG.CHECKPOINTS = []; return; }
-
-    // Store resolved raceId on currentUser for realtime filters
-    if (currentUser) currentUser.raceId = raceId;
+    // Load ALL checkpoints from all active races (visible to everyone)
+    const { data: activeRaces } = await sbClient.from('races')
+      .select('race_id').eq('is_active', true);
+    const activeIds = (activeRaces || []).map(r => r.race_id);
+    if (activeIds.length === 0) { CONFIG.CHECKPOINTS = []; return; }
 
     const { data, error } = await sbClient.from('checkpoints')
-      .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
+      .select('*').in('race_id', activeIds).order('cp_order', { ascending: true });
     if (error || !data || data.length === 0) { CONFIG.CHECKPOINTS = []; return; }
     CONFIG.CHECKPOINTS = data.map(r => ({
       id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
@@ -3132,6 +3238,7 @@ async function loadCheckpointsFromSupabase(adminCode) {
 }
 
 async function _snapCheckpointsToRoad() {
+  const MAX_SNAP_METERS = 500;
   await Promise.all(CONFIG.CHECKPOINTS.map(async cp => {
     try {
       const url = `https://routing.openstreetmap.de/routed-foot/nearest/v1/foot/${cp.lng},${cp.lat}`;
@@ -3140,8 +3247,11 @@ async function _snapCheckpointsToRoad() {
       const json = await res.json();
       const snap = json.waypoints?.[0]?.location;
       if (snap) {
-        cp.snapLng = snap[0];
-        cp.snapLat = snap[1];
+        const d = haversineMeters(cp.lat, cp.lng, snap[1], snap[0]);
+        if (d <= MAX_SNAP_METERS) {
+          cp.snapLng = snap[0];
+          cp.snapLat = snap[1];
+        }
       }
     } catch(e) { /* keep original coords */ }
   }));
@@ -3266,8 +3376,7 @@ async function _loadCpRaceDropdown() {
   (races || []).forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.race_id;
-    const activeTag = r.is_current ? ' ● Aktivt' : '';
-    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})${activeTag}` : `${r.name}${activeTag}`;
+    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})` : r.name;
     sel.appendChild(opt);
   });
   // اختر الرحلة السابقة أو النشطة تلقائياً
@@ -3384,7 +3493,6 @@ async function renderNRRacesList() {
       <div style="flex:1; min-width:0;">
         <div style="font-weight:700; font-size:0.95rem;">${escHtml(race.name)}</div>
         ${adminInfo}
-        ${race.is_current ? '<div style="font-size:0.75rem;color:var(--green-dk);margin-top:2px;">● Aktivt</div>' : ''}
       </div>
       <span style="color:var(--muted);">▼</span>`;
 
@@ -3546,7 +3654,7 @@ function _drawSegments(cps, segments) {
   segments.forEach((points, i) => {
     if (!points || points.length < 2) return;
     // لا ترسم الخط إذا النقطة الأولى مكتملة (خضراء)
-    if (doneCheckpoints.has(cps[i].order)) return;
+    if (_isDone(cps[i])) return;
     const line = L.polyline(points, {
       color: '#C9A800', weight: 4, opacity: 0.78, dashArray: '10 6',
     }).addTo(leafletMap);
@@ -3614,7 +3722,7 @@ function rebuildMapMarkers() {
   if (activePulseMarker) { leafletMap.removeLayer(activePulseMarker); activePulseMarker = null; }
   activePulseOrder = null; activePulseCp = null;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const isDone = doneCheckpoints.has(cp.order);
+    const isDone = _isDone(cp);
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
       fillColor: isDone ? '#E24B4A' : '#0EA371', fillOpacity: 1,
