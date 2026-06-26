@@ -853,21 +853,7 @@
   </div>
   <div class="rapport-body">
 
-    <!-- dropdown السباقات -->
-    <div class="rapport-card">
-      <div class="rapport-card-title">Velg tur</div>
-      <select id="cpRaceSelect" class="form-select">
-        <option value="">-- Velg en tur --</option>
-      </select>
-      <!-- race actions -->
-      <div id="cpRaceInfo" style="display:none; margin-top:12px; gap:8px;">
-        <button id="cpActivateRaceBtn" style="flex:1; background:var(--green); color:#fff; border:none; border-radius:8px; padding:8px 14px; font-size:0.88rem; font-weight:600; cursor:pointer;">✓ Aktiver</button>
-        <button id="cpDeactivateRaceBtn" style="flex:1; background:none; border:1px solid var(--muted); border-radius:8px; padding:8px 14px; font-size:0.88rem; color:var(--muted); cursor:pointer;">✗ Deaktiver</button>
-      </div>
-      <div id="cpRaceActiveBadge" style="display:none; margin-top:8px; font-size:0.8rem; color:var(--green-dk); font-weight:600;">● Aktiv tur for deltakere</div>
-    </div>
-
-    <!-- نقاط السباق المختار -->
+    <!-- كل النقاط من كل الرحلات النشطة -->
     <div id="cpAdminList"></div>
 
   </div>
@@ -3257,9 +3243,7 @@ async function _snapCheckpointsToRoad() {
   }));
 }
 
-function _cpAdminRaceId() {
-  return document.getElementById('cpRaceSelect')?.value || null;
-}
+
 
 async function returnToMainScreen() {
   showScreen('mainScreen');
@@ -3272,7 +3256,6 @@ async function returnToMainScreen() {
 
 async function openCpAdminScreen() {
   showScreen('cpAdminScreen');
-  await _loadCpRaceDropdown();
   await renderCpAdminList();
 }
 
@@ -3358,95 +3341,6 @@ async function addRunnerByEmail() {
   await loadLøpereList();
 }
 
-async function _loadCpRaceDropdown() {
-  const sel          = document.getElementById('cpRaceSelect');
-  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
-
-  // السوبر أدمن لا يمكنه إنشاء سباقات (ليس لديه adminCode)
-  const newRaceBtn = document.getElementById('cpNewRaceHeaderBtn');
-  if (newRaceBtn) newRaceBtn.style.display = '';
-
-  // Regular admin sees their races; super admin sees ALL races
-  let query = sbClient.from('races').select('race_id,name,admin_code,is_current').eq('is_active', true).order('created_at');
-  if (!isSuperAdmin) query = query.eq('admin_code', currentUser.adminCode);
-  const { data: races } = await query;
-
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">-- Velg tur --</option>';
-  (races || []).forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = r.race_id;
-    opt.textContent = isSuperAdmin ? `${r.name} (${r.admin_code})` : r.name;
-    sel.appendChild(opt);
-  });
-  // اختر الرحلة السابقة أو النشطة تلقائياً
-  if (!isSuperAdmin) {
-    const activeRace = (races || []).find(r => r.is_current);
-    if (prev && [...sel.options].some(o => o.value === prev)) {
-      sel.value = prev;
-    } else if (activeRace) {
-      sel.value = activeRace.race_id;
-    }
-  }
-
-  const _updateRaceInfo = async () => {
-    const raceId = sel.value;
-    const info   = document.getElementById('cpRaceInfo');
-    const badge  = document.getElementById('cpRaceActiveBadge');
-    if (raceId) {
-      info.style.display = isSuperAdmin ? 'none' : 'flex'; info.style.gap = '8px';
-      badge.style.display = 'none';
-      const activateBtn   = document.getElementById('cpActivateRaceBtn');
-      const deactivateBtn = document.getElementById('cpDeactivateRaceBtn');
-      const { data: r } = await sbClient.from('races').select('is_current').eq('race_id', raceId).single();
-      const isActive = !!r?.is_current;
-      if (badge) { badge.style.display = isActive ? '' : 'none'; badge.textContent = '● Aktiv tur for deltakere'; }
-      if (activateBtn) {
-        activateBtn.disabled = isActive;
-        activateBtn.style.opacity = isActive ? '0.4' : '1';
-        activateBtn.onclick = async () => {
-          await activateRace(raceId, currentUser.adminCode);
-          await _updateRaceInfo();
-        };
-      }
-      if (deactivateBtn) {
-        deactivateBtn.disabled = !isActive;
-        deactivateBtn.style.opacity = !isActive ? '0.4' : '1';
-        deactivateBtn.onclick = async () => {
-          if (!confirm('Deaktiver turen for deltakere?')) return;
-          await sbClient.from('races').update({ is_current: false }).eq('race_id', raceId);
-          if (currentUser) currentUser.raceId = null;
-          showToast('Løpet er deaktivert', 't-warn', 2500);
-          await _refreshAllRaceUI();
-        };
-      }
-    } else {
-      info.style.display = 'none';
-      if (badge) badge.style.display = 'none';
-    }
-    await renderCpAdminList();
-    // Update map only if this race is the user's active race
-    const isUsersRace = currentUser?.raceId === raceId;
-    if (raceId && isUsersRace) {
-      const { data } = await sbClient.from('checkpoints')
-        .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
-      CONFIG.CHECKPOINTS = (data || []).map(r => ({
-        id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
-      }));
-      rebuildMapMarkers();
-      drawRaceRoute();
-    } else if (!isUsersRace) {
-      CONFIG.CHECKPOINTS = [];
-      rebuildMapMarkers();
-      _clearRaceRoute();
-      _clearArrow();
-    }
-  };
-
-  sel.onchange = _updateRaceInfo;
-  _updateRaceInfo(); // تطبيق على القيمة الحالية
-}
-
 function openNewRaceScreen() {
   showScreen('cpNewRaceScreen');
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
@@ -3505,8 +3399,7 @@ async function renderNRRacesList() {
     actions.style.cssText = 'padding:12px 14px; background:var(--bg);';
     actions.innerHTML = `
       <div id="nrCpInfo_${escHtml(race.race_id)}" style="margin-bottom:10px;"></div>
-      ${!isSuperAdmin ? `<button onclick="activateRaceNR('${escHtml(race.race_id)}')" style="width:100%;background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px;font-size:0.88rem;font-weight:600;cursor:pointer;">✓ Aktiver for deltakere</button>` : ''}
-      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;margin-top:8px;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett tur</button>`;
+      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett tur</button>`;
 
     body.appendChild(actions);
 
@@ -3598,7 +3491,6 @@ async function activateRace(raceId, adminCode) {
 
 async function _refreshAllRaceUI() {
   await Promise.all([
-    _loadCpRaceDropdown(),
     renderNRRacesList(),
     renderCpAdminList(),
   ]);
@@ -3622,23 +3514,51 @@ async function renderCpAdminList() {
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
   el.innerHTML = '<div class="list-empty">Laster…</div>';
   try {
-    const raceId = _cpAdminRaceId();
-    if (!raceId) { el.innerHTML = '<div class="list-empty">Velg en tur ovenfor.</div>'; return; }
-    const { data } = await sbClient.from('checkpoints')
-      .select('*').eq('race_id', raceId)
-      .order('cp_order', { ascending: true });
-    if (!data || data.length === 0) {
-      el.innerHTML = '<div class="list-empty">Ingen steder lagt til ennå.</div>';
+    const { data: races } = await sbClient.from('races')
+      .select('race_id,name,admin_code').eq('is_active', true).order('created_at');
+    if (!races || races.length === 0) {
+      el.innerHTML = '<div class="list-empty">Ingen aktive turer.</div>';
       return;
     }
-    el.innerHTML = data.map(cp => `
-      <div class="cp-admin-item">
-        <div class="cp-admin-num">${cp.cp_order}</div>
-        <div class="cp-admin-info">
-          <div class="cp-admin-name">${escHtml(cp.name)}</div>
-          <div class="cp-admin-coords">${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}</div>
+    const raceIds = races.map(r => r.race_id);
+    const { data: cps } = await sbClient.from('checkpoints')
+      .select('*').in('race_id', raceIds).order('cp_order', { ascending: true });
+
+    const cpByRace = {};
+    (cps || []).forEach(cp => {
+      if (!cpByRace[cp.race_id]) cpByRace[cp.race_id] = [];
+      cpByRace[cp.race_id].push(cp);
+    });
+
+    let adminEmails = {};
+    if (isSuperAdmin) {
+      const codes = [...new Set(races.map(r => r.admin_code))];
+      const { data: admins } = await sbClient.from('admins').select('admin_code,email').in('admin_code', codes);
+      (admins || []).forEach(a => { adminEmails[a.admin_code] = a.email; });
+    }
+
+    el.innerHTML = '';
+    races.forEach(race => {
+      const items = cpByRace[race.race_id] || [];
+      const adminInfo = isSuperAdmin ? ` <span style="color:var(--muted);font-weight:400;font-size:0.78rem;">(${adminEmails[race.admin_code] || race.admin_code})</span>` : '';
+
+      const card = document.createElement('div');
+      card.style.cssText = 'margin-bottom:14px; border:1px solid var(--border); border-radius:12px; overflow:hidden;';
+      card.innerHTML = `
+        <div style="padding:12px 14px; background:var(--surface-2,var(--surface)); border-bottom:1px solid var(--border);">
+          <div style="font-weight:700; font-size:0.95rem;">${escHtml(race.name)}${adminInfo}</div>
+          ${items.length === 0 ? '<div style="font-size:0.8rem;color:var(--muted);margin-top:4px;">Ingen steder lagt til</div>' : ''}
         </div>
-      </div>`).join('');
+        ${items.map(cp => `
+          <div class="cp-admin-item" style="border-bottom:1px solid var(--border);">
+            <div class="cp-admin-num">${cp.cp_order}</div>
+            <div class="cp-admin-info">
+              <div class="cp-admin-name">${escHtml(cp.name)}</div>
+              <div class="cp-admin-coords">${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}</div>
+            </div>
+          </div>`).join('')}`;
+      el.appendChild(card);
+    });
   } catch(e) { el.innerHTML = '<div style="color:var(--red);">Feil ved lasting.</div>'; }
 }
 
