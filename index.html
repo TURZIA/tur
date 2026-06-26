@@ -1106,7 +1106,9 @@ let positionMarker    = null;   // نقطة زرقاء
 let liveTrackLine     = null;   // خط المسار الحي
 let trackPoints       = [];     // نقاط المسار [[lat,lng],...]
 let cpMarkers         = {};     // { order: L.circleMarker }
-let doneCheckpoints   = new Set(); // checkpoint orders already registered in current race (from DB)
+let doneCheckpoints   = new Set(); // keys: "raceId_order"
+function _doneKey(raceId, order) { return `${raceId||''}_${order}`; }
+function _isDone(cp) { return doneCheckpoints.has(_doneKey(cp.raceId, cp.order)); }
 let raceRouteLine     = null;   // unused — kept for compat
 let raceRouteSegments = [];     // L.polyline per segment
 const LS_RACE_ROUTE   = 'raceRoute_v2';
@@ -1258,7 +1260,6 @@ async function fetchRunnerHistory(runnerId) {
       .from('check_ins')
       .select('checkpoint_name, checkpoint_order, lat_recorded, lng_recorded, accuracy_meters, timestamp, elapsed_seconds, race_id')
       .eq('runner_id', runnerId)
-      .eq('race_id', currentUser?.raceId || '')
       .order('timestamp', { ascending: true });
     if (error) throw error;
     return data || [];
@@ -1414,7 +1415,7 @@ function initMap() {
 
 function drawCheckpointMarkers() {
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const isDone = doneCheckpoints.has(cp.order);
+    const isDone = _isDone(cp);
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
       fillColor: isDone ? '#E24B4A' : '#0EA371', fillOpacity: 1,
@@ -1588,7 +1589,7 @@ async function loadPreviousRegistrationsOnMap(runnerId) {
     const doneToday = new Date(entry.timestamp).toDateString() === today;
     if (doneToday) {
       markCheckpointDone(Number(order), entry.race_id);
-      doneCheckpoints.add(Number(order));
+      doneCheckpoints.add(_doneKey(entry.race_id, Number(order)));
     }
   });
   updateProgressBadge();
@@ -1618,7 +1619,7 @@ function updateRegisterButton(lat, lng) {
   const { checkpoint, distance } = findNearestCheckpoint(lat, lng);
 
   if (distance <= CONFIG.MAX_DISTANCE_METERS) {
-    if (doneCheckpoints.has(checkpoint.order)) {
+    if (_isDone(checkpoint)) {
       stopPulse();
       btn.className = 'btn btn-gray';
       btn.textContent = `✓ ${checkpoint.name} — allerede registrert`;
@@ -1840,7 +1841,7 @@ function updateCompass(lat, lng) {
 
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    if (doneCheckpoints.has(cp.order)) return;
+    if (_isDone(cp)) return;
     const cLat = cp.snapLat ?? cp.lat;
     const cLng = cp.snapLng ?? cp.lng;
     const d = haversineMeters(lat, lng, cLat, cLng);
@@ -1872,11 +1873,11 @@ function updateCompass(lat, lng) {
 
   _osrmTimer = setTimeout(async () => {
     if (_osrmTarget?.order !== target.order) return;
-    if (doneCheckpoints.has(target.order)) return;
+    if (_isDone(target)) return;
 
     const drawRoute = (coords) => {
       if (_osrmTarget?.order !== target.order) return;
-      if (doneCheckpoints.has(target.order)) return;
+      if (_isDone(target)) return;
       if (!coords || coords.length < 2) return;
       _clearArrow();
       arrowLine = L.polyline(coords, {
@@ -1941,7 +1942,7 @@ function _updateCompassArrow() {
   // Use in-memory doneCheckpoints (no localStorage read needed)
   let target = null, minDist = Infinity;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    if (doneCheckpoints.has(cp.order)) return;
+    if (_isDone(cp)) return;
     const d = haversineMeters(_compassUserLat, _compassUserLng, cp.snapLat ?? cp.lat, cp.snapLng ?? cp.lng);
     if (d < minDist) { minDist = d; target = cp; }
   });
@@ -2168,7 +2169,7 @@ async function registerPosition() {
       return;
     }
 
-    if (nearestCp && doneCheckpoints.has(nearestCp.order)) {
+    if (nearestCp && _isDone(nearestCp)) {
       showToast(`${nearestCp.name} er allerede registrert`, 't-warn', 3000);
       return;
     }
@@ -2210,7 +2211,7 @@ async function registerPosition() {
     }
 
     appendLocalLog(entry);
-    if (nearestCp) { setCpTime(nearestCp.order); doneCheckpoints.add(nearestCp.order); }
+    if (nearestCp) { setCpTime(nearestCp.order); doneCheckpoints.add(_doneKey(nearestCp.raceId, nearestCp.order)); }
 
     // تلوين النقطة على الخريطة
     if (nearestCp) markCheckpointDone(nearestCp.order, nearestCp.raceId);
@@ -2221,8 +2222,7 @@ async function registerPosition() {
     showToast(`Registrert!${cpLabel}`, 't-success');
 
     // Check if all checkpoints are now done
-    const allOrders = CONFIG.CHECKPOINTS.map(cp => cp.order);
-    if (allOrders.length > 0 && allOrders.every(o => doneCheckpoints.has(o))) {
+    if (CONFIG.CHECKPOINTS.length > 0 && CONFIG.CHECKPOINTS.every(cp => _isDone(cp))) {
       setTimeout(() => showToast('Gratulerer! Du har besøkt alle steder i dag! 🎉', 't-success', 8000), 1500);
     }
 
@@ -2562,40 +2562,33 @@ function startRealtime(runner) {
 
   const ch = sbClient.channel('live-updates');
 
-  // check_ins: only for runners who have a resolved race
-  if (!isSuperAdmin && raceId) {
+  // check_ins: listen for own check-ins
+  if (!isSuperAdmin) {
     ch.on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'check_ins',
-      filter: `race_id=eq.${raceId}`,
+      filter: `runner_id=eq.${runner.id}`,
     }, payload => {
       const row = payload.new;
-      if (row.runner_id === runner.id && row.checkpoint_order) {
-        doneCheckpoints.add(row.checkpoint_order);
+      if (row.checkpoint_order) {
+        doneCheckpoints.add(_doneKey(row.race_id, row.checkpoint_order));
         markCheckpointDone(row.checkpoint_order, row.race_id);
         drawRaceRoute();
       }
-      if (document.getElementById('historyDrawer').classList.contains('open') &&
-          row.runner_id === runner.id) {
+      if (document.getElementById('historyDrawer').classList.contains('open')) {
         loadDrawerHistory();
       }
     });
   }
 
-  // checkpoints INSERT — super admin listens to all; runner/admin filter by their race
-  const cpInsertOpts = isSuperAdmin
-    ? { event: 'INSERT', schema: 'public', table: 'checkpoints' }
-    : raceId
-      ? { event: 'INSERT', schema: 'public', table: 'checkpoints', filter: `race_id=eq.${raceId}` }
-      : null; // no active race yet — skip
-
-  if (cpInsertOpts) {
-    ch.on('postgres_changes', cpInsertOpts, async () => {
-      await loadCheckpointsFromSupabase(adminCode);
-      rebuildMapMarkers();
-      if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
-      drawRaceRoute();
-    });
-  }
+  // checkpoints INSERT/UPDATE — everyone listens to all checkpoints
+  ch.on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'checkpoints',
+  }, async () => {
+    await loadCheckpointsFromSupabase(adminCode);
+    rebuildMapMarkers();
+    if (!isSuperAdmin && runner?.id) await loadPreviousRegistrationsOnMap(runner.id);
+    drawRaceRoute();
+  });
 
   ch.on('postgres_changes', {
     event: 'DELETE', schema: 'public', table: 'checkpoints',
@@ -2606,27 +2599,22 @@ function startRealtime(runner) {
     drawRaceRoute();
   });
 
-  // races UPDATE: runner/admin detects when a race is activated or deactivated
-  if (!isSuperAdmin && adminCode) {
+  // races UPDATE: refresh all checkpoints when any race is activated/deactivated
+  if (!isSuperAdmin) {
     ch.on('postgres_changes', {
       event: 'UPDATE', schema: 'public', table: 'races',
     }, async payload => {
-      if (payload.new?.admin_code !== adminCode) return;
+      const isOwnAdmin = payload.new?.admin_code === adminCode;
       const newRaceId = payload.new?.race_id;
       const isCurrent = !!payload.new?.is_current;
+      const isActive = !!payload.new?.is_active;
 
-      if (isCurrent) {
+      if (isOwnAdmin && isCurrent && isActive) {
         if (currentUser) currentUser.raceId = newRaceId;
-        await _doFullRefresh();
-        showToast('Arrangøren har aktivert en ny tur', 't-success', 3000);
-      } else if (currentUser?.raceId === newRaceId) {
-        setTimeout(async () => {
-          if (currentUser?.raceId === newRaceId) {
-            currentUser.raceId = null;
-            await _doFullRefresh();
-            showToast('Arrangøren har deaktivert turen', 't-warn', 3000);
-          }
-        }, 1500);
+      }
+      await _doFullRefresh();
+      if (isCurrent && isActive) {
+        showToast('En ny tur er aktivert', 't-success', 3000);
       }
     });
   }
@@ -3216,32 +3204,35 @@ async function loadCheckpointsFromSupabase(adminCode) {
   if (!sbClient) return;
   doneCheckpoints.clear();
   const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  const isAdmin = isSuperAdmin || !!adminCode;
 
   try {
     if (isSuperAdmin) {
-      // Super admin sees all checkpoints from all active races
       const { data, error } = await sbClient.from('checkpoints')
         .select('*').order('cp_order', { ascending: true });
       if (error || !data) { CONFIG.CHECKPOINTS = []; return; }
       CONFIG.CHECKPOINTS = data.map(r => ({
         id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
       }));
+      await _snapCheckpointsToRoad();
       return;
     }
 
-    if (!adminCode) { CONFIG.CHECKPOINTS = []; return; }
+    // Resolve the user's own raceId for check-in recording
+    if (adminCode && currentUser) {
+      const { data: activeRace } = await sbClient.from('races')
+        .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).maybeSingle();
+      if (activeRace) currentUser.raceId = activeRace.race_id;
+    }
 
-    // Find the admin's currently active race
-    const { data: activeRace } = await sbClient.from('races')
-      .select('race_id').eq('admin_code', adminCode).eq('is_current', true).eq('is_active', true).single();
-    const raceId = activeRace?.race_id;
-    if (!raceId) { CONFIG.CHECKPOINTS = []; return; }
-
-    // Store resolved raceId on currentUser for realtime filters
-    if (currentUser) currentUser.raceId = raceId;
+    // Load ALL checkpoints from all active races (visible to everyone)
+    const { data: activeRaces } = await sbClient.from('races')
+      .select('race_id').eq('is_active', true);
+    const activeIds = (activeRaces || []).map(r => r.race_id);
+    if (activeIds.length === 0) { CONFIG.CHECKPOINTS = []; return; }
 
     const { data, error } = await sbClient.from('checkpoints')
-      .select('*').eq('race_id', raceId).order('cp_order', { ascending: true });
+      .select('*').in('race_id', activeIds).order('cp_order', { ascending: true });
     if (error || !data || data.length === 0) { CONFIG.CHECKPOINTS = []; return; }
     CONFIG.CHECKPOINTS = data.map(r => ({
       id: r.id, order: r.cp_order, name: r.name, lat: r.lat, lng: r.lng, raceId: r.race_id,
@@ -3669,7 +3660,7 @@ function _drawSegments(cps, segments) {
   segments.forEach((points, i) => {
     if (!points || points.length < 2) return;
     // لا ترسم الخط إذا النقطة الأولى مكتملة (خضراء)
-    if (doneCheckpoints.has(cps[i].order)) return;
+    if (_isDone(cps[i])) return;
     const line = L.polyline(points, {
       color: '#C9A800', weight: 4, opacity: 0.78, dashArray: '10 6',
     }).addTo(leafletMap);
@@ -3737,7 +3728,7 @@ function rebuildMapMarkers() {
   if (activePulseMarker) { leafletMap.removeLayer(activePulseMarker); activePulseMarker = null; }
   activePulseOrder = null; activePulseCp = null;
   CONFIG.CHECKPOINTS.forEach(cp => {
-    const isDone = doneCheckpoints.has(cp.order);
+    const isDone = _isDone(cp);
     const marker = L.circleMarker([cp.lat, cp.lng], {
       radius: 9, color: '#fff', weight: 2,
       fillColor: isDone ? '#E24B4A' : '#0EA371', fillOpacity: 1,
