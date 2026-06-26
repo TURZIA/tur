@@ -3542,21 +3542,17 @@ async function renderCpAdminList() {
       const items = cpByRace[race.race_id] || [];
       const adminInfo = isSuperAdmin ? ` <span style="color:var(--muted);font-weight:400;font-size:0.78rem;">(${adminEmails[race.admin_code] || race.admin_code})</span>` : '';
 
+      const cp = items[0];
+      const coords = cp ? `${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}` : '';
+
       const card = document.createElement('div');
-      card.style.cssText = 'margin-bottom:14px; border:1px solid var(--border); border-radius:12px; overflow:hidden;';
+      card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);';
       card.innerHTML = `
-        <div style="padding:12px 14px; background:var(--surface-2,var(--surface)); border-bottom:1px solid var(--border);">
-          <div style="font-weight:700; font-size:0.95rem;">${escHtml(race.name)}${adminInfo}</div>
-          ${items.length === 0 ? '<div style="font-size:0.8rem;color:var(--muted);margin-top:4px;">Ingen steder lagt til</div>' : ''}
-        </div>
-        ${items.map(cp => `
-          <div class="cp-admin-item" style="border-bottom:1px solid var(--border);">
-            <div class="cp-admin-num">${cp.cp_order}</div>
-            <div class="cp-admin-info">
-              <div class="cp-admin-name">${escHtml(cp.name)}</div>
-              <div class="cp-admin-coords">${cp.lat.toFixed(6)}, ${cp.lng.toFixed(6)}</div>
-            </div>
-          </div>`).join('')}`;
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--green);flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:0.95rem;">${escHtml(race.name)}${adminInfo}</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:2px;">${coords}</div>
+        </div>`;
       el.appendChild(card);
     });
   } catch(e) { el.innerHTML = '<div style="color:var(--red);">Feil ved lasting.</div>'; }
