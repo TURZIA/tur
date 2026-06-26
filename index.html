@@ -2097,12 +2097,14 @@ function escHtml(str) {
 function openDrawer() {
   document.getElementById('drawerOverlay').classList.add('visible');
   document.getElementById('historyDrawer').classList.add('open');
+  document.getElementById('cpSearchWrap').style.display = 'none';
   loadDrawerHistory();
 }
 
 function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('visible');
   document.getElementById('historyDrawer').classList.remove('open');
+  document.getElementById('cpSearchWrap').style.display = '';
 }
 
 async function loadDrawerHistory() {
