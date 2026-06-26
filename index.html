@@ -1723,7 +1723,7 @@ function updateProgressBadge() {
   const badge = document.getElementById('progressBadge');
   if (!badge) return;
   const total = CONFIG.CHECKPOINTS.length;
-  if (total === 0 || currentUser?.email?.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase()) {
+  if (total === 0) {
     badge.style.display = 'none';
     return;
   }
