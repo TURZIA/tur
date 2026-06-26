@@ -800,6 +800,14 @@
 
   <!-- MAP -->
   <div id="mapContainer">
+    <!-- Search checkpoints -->
+    <div id="cpSearchWrap" style="position:absolute;top:10px;left:50px;right:50px;z-index:1000;">
+      <div style="position:relative;">
+        <input id="cpSearchInput" type="text" placeholder="Søk sted..." style="width:100%;padding:9px 14px;padding-right:36px;border:1px solid var(--border);border-radius:10px;font-size:0.88rem;background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,0.12);outline:none;">
+        <button id="cpSearchClear" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:1.1rem;color:var(--muted);cursor:pointer;padding:4px;">✕</button>
+      </div>
+      <div id="cpSearchResults" style="display:none;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-height:200px;overflow-y:auto;"></div>
+    </div>
     <div id="map"></div>
 
     <!-- COMPASS -->
@@ -1382,6 +1390,7 @@ function initMap() {
 
   // رسم نقاط السباق
   drawCheckpointMarkers();
+  initCpSearch();
 
   // Zoom to fit all checkpoints if available
   if (CONFIG.CHECKPOINTS.length >= 2) {
@@ -1809,6 +1818,7 @@ async function _fetchOsrmRoute(lat, lng, target, onFirstResult) {
 
 function updateCompass(lat, lng) {
   if (!leafletMap) return;
+  if (_searchSelectedCp) return;
   if (currentUser?.email === CONFIG.ADMIN_EMAIL) { _clearArrow(); return; }
 
   const now = Date.now();
@@ -1863,6 +1873,99 @@ function updateCompass(lat, lng) {
 
     await _fetchOsrmRoute(lat, lng, target, drawRoute);
   }, OSRM_DEBOUNCE);
+}
+
+/* ============================================================
+   CHECKPOINT SEARCH — search & navigate to any checkpoint
+   ============================================================ */
+let _searchSelectedCp = null;
+
+function initCpSearch() {
+  const input = document.getElementById('cpSearchInput');
+  const results = document.getElementById('cpSearchResults');
+  const clearBtn = document.getElementById('cpSearchClear');
+  if (!input) return;
+
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    results.style.display = 'none';
+    clearBtn.style.display = 'none';
+    clearSearchSelection();
+    _clearArrow();
+  });
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    clearBtn.style.display = q.length > 0 ? '' : 'none';
+    if (q.length === 0) { results.style.display = 'none'; clearSearchSelection(); _clearArrow(); return; }
+
+    const matches = CONFIG.CHECKPOINTS.filter(cp =>
+      cp.name.toLowerCase().includes(q)
+    );
+
+    if (matches.length === 0) {
+      results.innerHTML = '<div style="padding:10px 14px;color:var(--muted);font-size:0.85rem;">Ingen treff</div>';
+      results.style.display = '';
+      return;
+    }
+
+    results.innerHTML = matches.map(cp => `
+      <div class="cp-search-row" data-race="${cp.raceId}" data-order="${cp.order}"
+           style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.88rem;">
+        <div style="font-weight:600;">${escHtml(cp.name)}</div>
+      </div>`).join('');
+    results.style.display = '';
+
+    results.querySelectorAll('.cp-search-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const rId = row.dataset.race;
+        const ord = Number(row.dataset.order);
+        const cp = CONFIG.CHECKPOINTS.find(c => c.raceId === rId && c.order === ord);
+        if (cp) selectSearchCheckpoint(cp);
+        results.style.display = 'none';
+        input.value = cp?.name || '';
+      });
+    });
+  });
+
+  input.addEventListener('focus', () => { if (input.value.trim()) input.dispatchEvent(new Event('input')); });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#cpSearchWrap')) results.style.display = 'none';
+  });
+}
+
+function selectSearchCheckpoint(cp) {
+  _searchSelectedCp = cp;
+  if (leafletMap) leafletMap.setView([cp.lat, cp.lng], 14);
+
+  if (_compassUserLat !== null) {
+    _clearArrow();
+    const lat = _compassUserLat, lng = _compassUserLng;
+    const dist = haversineMeters(lat, lng, cp.lat, cp.lng);
+    _drawStraightArrow(lat, lng, cp, dist);
+    _osrmTarget = cp;
+    _osrmLastFetchPos = [lat, lng];
+    clearTimeout(_osrmTimer);
+    _osrmTimer = setTimeout(async () => {
+      const drawRoute = (coords) => {
+        if (_searchSelectedCp?.order !== cp.order || _searchSelectedCp?.raceId !== cp.raceId) return;
+        if (!coords || coords.length < 2) return;
+        _clearArrow();
+        arrowLine = L.polyline(coords, {
+          color: '#FF6B6B', weight: 4, opacity: 0.85, dashArray: '10 6',
+        }).addTo(leafletMap);
+        const n = coords.length;
+        _drawArrowHead(coords[n-1], _bearing(coords[n-2][0], coords[n-2][1], coords[n-1][0], coords[n-1][1]));
+      };
+      await _fetchOsrmRoute(lat, lng, cp, drawRoute);
+    }, OSRM_DEBOUNCE);
+  }
+}
+
+function clearSearchSelection() {
+  _searchSelectedCp = null;
+  const input = document.getElementById('cpSearchInput');
+  if (input) input.value = '';
 }
 
 /* ============================================================
