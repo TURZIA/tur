@@ -3469,9 +3469,10 @@ async function renderNRRacesList() {
 
     const actions = document.createElement('div');
     actions.style.cssText = 'padding:12px 14px; background:var(--bg);';
+    const canDelete = isSuperAdmin || race.admin_code === adminCode;
     actions.innerHTML = `
       <div id="nrCpInfo_${escHtml(race.race_id)}" style="margin-bottom:10px;"></div>
-      <button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett tur</button>`;
+      ${canDelete ? `<button onclick="deleteRace('${escHtml(race.race_id)}')" style="width:100%;background:none;border:1px solid var(--red);border-radius:10px;padding:9px;color:var(--red);font-size:0.88rem;font-weight:600;cursor:pointer;">Slett tur</button>` : ''}`;
 
     body.appendChild(actions);
 
@@ -3575,6 +3576,14 @@ async function activateRaceNR(raceId) {
 }
 
 async function deleteRace(raceId) {
+  const isSuperAdmin = currentUser?.email === CONFIG.ADMIN_EMAIL;
+  if (!isSuperAdmin) {
+    const { data: race } = await sbClient.from('races').select('admin_code').eq('race_id', raceId).maybeSingle();
+    if (!race || race.admin_code !== adminCode) {
+      showToast('Du kan bare slette dine egne turer.', 't-error');
+      return;
+    }
+  }
   if (!confirm('Slett denne turen og alle stedene?')) return;
   await sbClient.from('checkpoints').delete().eq('race_id', raceId);
   await sbClient.from('races').update({ is_active: false, is_current: false }).eq('race_id', raceId);
