@@ -2456,7 +2456,7 @@ async function handleSignup() {
   try {
     const { data, error } = await sbClient.auth.signUp({
       email, password,
-      options: { data: { full_name: name } },
+      options: { data: { full_name: name, admin_code: adminCode || null } },
     });
     if (error) throw error;
 
@@ -2510,7 +2510,8 @@ async function onAuthSuccess(user, nameOverride) {
 
       if (!data) {
         // Runner not in DB yet (e.g. after email confirmation) — create entry
-        await saveRunnerToSupabase(user.id, name, null, user.email);
+        const savedCode = user.user_metadata?.admin_code || null;
+        await saveRunnerToSupabase(user.id, name, savedCode, user.email);
       } else if (data?.race_id) {
         const { data: activeAdmin, error: adminErr } = await sbClient.from('admins')
           .select('admin_code').eq('admin_code', data.race_id).eq('is_active', true).maybeSingle();
