@@ -207,15 +207,9 @@
       transition: background 0.15s;
     }
     .historikk-btn:active { background: rgba(255,255,255,0.3); }
-    .runner-info { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; }
     .runner-name-display {
       font-size: 0.92rem; font-weight: 600;
       max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .ikke-deg-link {
-      font-size: 0.72rem; color: rgba(255,255,255,0.8);
-      text-decoration: underline; cursor: pointer;
-      background: none; border: none; padding: 2px 0; min-height: 24px;
     }
 
     /* GPS bar */
@@ -455,7 +449,7 @@
     }
 
     /* ===== RAPPORT SCREEN ===== */
-    #rapportScreen, #cpAdminScreen, #superAdminScreen {
+    #rapportScreen, #cpAdminScreen, #superAdminScreen, #profileScreen {
       background: var(--bg);
       overflow-y: auto;
     }
@@ -634,6 +628,69 @@
       font-size: 0.85rem; padding: 10px 14px;
       border-radius: var(--radius-sm); text-align: center; font-weight: 500;
     }
+
+    /* ===== PROFIL ===== */
+    .profile-trigger {
+      display: flex; align-items: center; gap: 9px;
+      background: none; border: none; padding: 3px 3px 3px 10px;
+      color: #fff; font-family: inherit; cursor: pointer;
+      border-radius: 22px; flex-shrink: 0; min-height: 40px; min-width: 48px;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    }
+    .profile-trigger:active { background: rgba(255,255,255,0.22); }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.22);
+      border: 1.5px solid rgba(255,255,255,0.5);
+      font-size: 0.8rem; font-weight: 700;
+      backdrop-filter: blur(4px);
+    }
+    .profile-hero {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      padding: 22px 16px 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow-sm);
+    }
+    .profile-hero .avatar {
+      width: 74px; height: 74px; font-size: 1.55rem; color: #fff;
+      background: linear-gradient(135deg, #0EA371 0%, #0B8A60 100%);
+      border: none; margin-bottom: 6px;
+      box-shadow: 0 6px 18px rgba(14,163,113,0.32);
+    }
+    .profile-hero-name {
+      font-size: 1.15rem; font-weight: 700;
+      letter-spacing: -0.01em; text-align: center;
+    }
+    .profile-hero-email {
+      font-size: 0.85rem; color: var(--muted);
+      text-align: center; word-break: break-all;
+    }
+    .profile-role {
+      margin-top: 5px; padding: 3px 12px; border-radius: 20px;
+      background: var(--green-lt); color: var(--green-dk);
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    .profile-role.is-super { background: #F5F3FF; color: #6D28D9; }
+    .profile-hint { font-size: 0.78rem; color: var(--muted); line-height: 1.45; }
+    #profileScreen input:disabled {
+      background: #EDEFF2; color: var(--muted);
+      border-style: dashed; cursor: not-allowed;
+    }
+    .profile-danger { border-color: rgba(239,68,68,0.35); }
+    .btn-sm { padding: 11px; min-height: 46px; font-size: 0.93rem; }
+    .btn-outline {
+      background: var(--surface); color: var(--text-2);
+      border: 1.5px solid var(--border);
+    }
+    .btn-outline:not(:disabled):active { background: var(--bg); }
+    .btn-red {
+      background: var(--red); color: #fff;
+      box-shadow: 0 4px 14px rgba(239,68,68,0.3);
+    }
+    .btn-red:not(:disabled):active { box-shadow: 0 2px 6px rgba(239,68,68,0.25); }
     /* Lists inside rapport-body */
     #adminList, #cpAdminList {
       display: flex; flex-direction: column; gap: 8px;
@@ -778,10 +835,10 @@
         <span class="race-name" id="headerRaceName">TUR</span>
         <span class="progress-badge" id="progressBadge" style="display:none;">0/0</span>
       </div>
-      <div class="runner-info">
+      <button class="profile-trigger" id="profileBtn" aria-label="Min profil" title="Min profil">
         <span class="runner-name-display" id="headerRunnerName"></span>
-        <button class="ikke-deg-link" id="ikkeDegBtn">Ikke deg?</button>
-      </div>
+        <span class="avatar" id="headerAvatar" aria-hidden="true"></span>
+      </button>
     </div>
     <div class="header-row2">
       <button class="historikk-btn" id="historikkBtn">Historikk</button>
@@ -827,6 +884,57 @@
 
   <div class="register-wrap">
     <button class="btn btn-gray" id="registerBtn">Henter posisjon…</button>
+  </div>
+</div>
+
+<!-- ===== PROFILE SCREEN ===== -->
+<div id="profileScreen" class="screen">
+  <div class="rapport-header">
+    <button class="rapport-back" id="profileBackBtn">← Tilbake</button>
+    <span class="rapport-title">Min profil</span>
+  </div>
+  <div class="rapport-body">
+
+    <div class="profile-hero">
+      <div class="avatar" id="profileAvatar"></div>
+      <div class="profile-hero-name" id="profileHeroName">—</div>
+      <div class="profile-hero-email" id="profileHeroEmail">—</div>
+      <span class="profile-role" id="profileRole">Deltaker</span>
+    </div>
+
+    <!-- Navn -->
+    <div class="rapport-card">
+      <div class="rapport-card-title">Navn</div>
+      <input type="text" id="profileNameInput" placeholder="Ditt navn" maxlength="60"
+             autocomplete="name" autocorrect="off" spellcheck="false" />
+      <button class="btn btn-green btn-sm" id="profileSaveNameBtn">Lagre navn</button>
+      <div id="profileNameMsg" class="form-msg" style="display:none;"></div>
+    </div>
+
+    <!-- E-post -->
+    <div class="rapport-card">
+      <div class="rapport-card-title">E-post</div>
+      <input type="email" id="profileEmailInput" placeholder="deg@example.com"
+             autocomplete="email" autocorrect="off" autocapitalize="none" spellcheck="false" />
+      <div class="profile-hint" id="profileEmailHint">Vi sender en bekreftelseslenke til den nye adressen. E-posten byttes først når du har klikket på lenken.</div>
+      <button class="btn btn-green btn-sm" id="profileSaveEmailBtn">Endre e-post</button>
+      <div id="profileEmailMsg" class="form-msg" style="display:none;"></div>
+    </div>
+
+    <!-- Logg ut -->
+    <div class="rapport-card">
+      <div class="rapport-card-title">Økt</div>
+      <button class="btn btn-outline btn-sm" id="profileSignoutBtn">Logg ut</button>
+    </div>
+
+    <!-- Slett konto -->
+    <div class="rapport-card profile-danger">
+      <div class="rapport-card-title" style="color:var(--red);">Faresone</div>
+      <div class="profile-hint" id="profileDeleteHint">Kontoen din og all historikken slettes for alltid. Dette kan ikke angres.</div>
+      <button class="btn btn-red btn-sm" id="profileDeleteBtn">Slett kontoen min</button>
+      <div id="profileDeleteMsg" class="form-msg" style="display:none;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -2490,17 +2598,30 @@ async function onAuthSuccess(user, nameOverride) {
   const isSuperAdmin = user.email?.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
 
   // Run admin + runner queries in parallel to save one round trip
+  // Admin-raden slås opp på user_id i tillegg til e-post — e-posten kan være byttet.
+  const adminFilter = `user_id.eq.${user.id},email.eq."${(user.email || '').replace(/"/g, '')}"`;
   const [adminQ, runnerQ] = await Promise.all([
     isSuperAdmin
       ? Promise.resolve({ data: null })
-      : sbClient.from('admins').select('admin_code').eq('email', user.email).eq('is_active', true).maybeSingle(),
+      : sbClient.from('admins').select('admin_code,email,user_id').or(adminFilter).eq('is_active', true).limit(1).maybeSingle(),
     isSuperAdmin
       ? Promise.resolve({ data: null })
-      : sbClient.from('runners').select('name,race_id,prev_race_id').eq('id', user.id).maybeSingle(),
+      : sbClient.from('runners').select('name,race_id,prev_race_id,email').eq('id', user.id).maybeSingle(),
   ]);
 
   let isAdmin = isSuperAdmin;
   if (!isSuperAdmin && adminQ.data) { isAdmin = true; adminOwnCode = adminQ.data.admin_code; }
+
+  // Speil e-posten fra auth ned i tabellene og bind admin-raden til brukeren,
+  // slik at et e-postbytte verken river bort rettigheter eller historikk.
+  const authEmail = (user.email || '').toLowerCase();
+  const needsSync = !isSuperAdmin && (
+    (adminQ.data && (!adminQ.data.user_id || (adminQ.data.email || '').toLowerCase() !== authEmail)) ||
+    (!isAdmin && runnerQ.data && (runnerQ.data.email || '').toLowerCase() !== authEmail)
+  );
+  if (needsSync) {
+    try { await invokeAccountFn({ action: 'sync' }); } catch (e) { console.warn('profil-sync:', e); }
+  }
 
   // Only use runner result if user is NOT an admin
   if (!isAdmin) {
@@ -2550,7 +2671,7 @@ async function onAuthSuccess(user, nameOverride) {
   // الأدمن يستخدم كوده الخاص للإدارة؛ الراكض العادي يستخدم كود السباق المسجّل فيه
   adminCode = adminOwnCode || runnerAdminCode;
 
-  currentUser = { id: user.id, name, email: user.email, adminCode };
+  currentUser = { id: user.id, name, email: user.email, adminCode, isAdmin, isSuperAdmin };
 
   document.getElementById('rapportBtn').style.display    = isAdmin ? '' : 'none';
   document.getElementById('cpAdminBtn').style.display    = isAdmin ? '' : 'none';
@@ -2590,9 +2711,175 @@ async function handleSignout() {
   showScreen('loginScreen');
 }
 
+/* ============================================================
+   PROFIL — navn, e-post, utlogging og sletting av konto
+   ============================================================ */
+
+/** Kaller edge-funksjonen `account` og gjør feilen lesbar for brukeren. */
+async function invokeAccountFn(payload) {
+  const { data, error } = await sbClient.functions.invoke('account', { body: payload });
+  if (error) {
+    let detail = error.message || 'Serverfeil';
+    try {
+      const body = await error.context?.json();
+      if (body?.error) detail = body.error;
+    } catch {}
+    throw new Error(detail);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+function getInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  const first = parts[0][0] || '';
+  const last  = parts.length > 1 ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
+
+/** Holder navnet og avataren i toppmenyen synkron med currentUser. */
+function updateHeaderIdentity() {
+  const name = currentUser?.name || '';
+  document.getElementById('headerRunnerName').textContent = name;
+  document.getElementById('headerAvatar').textContent     = getInitials(name);
+}
+
+function isSuperAdminUser() {
+  return (currentUser?.email || '').toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
+}
+
+function openProfileScreen() {
+  if (!currentUser) return;
+  const superAdmin = isSuperAdminUser();
+
+  document.getElementById('profileAvatar').textContent    = getInitials(currentUser.name);
+  document.getElementById('profileHeroName').textContent  = currentUser.name  || '—';
+  document.getElementById('profileHeroEmail').textContent = currentUser.email || '—';
+
+  const roleEl = document.getElementById('profileRole');
+  roleEl.textContent = superAdmin ? 'Superadmin' : (currentUser.isAdmin ? 'Arrangør' : 'Deltaker');
+  roleEl.classList.toggle('is-super', superAdmin);
+
+  document.getElementById('profileNameInput').value  = currentUser.name  || '';
+  document.getElementById('profileEmailInput').value = currentUser.email || '';
+
+  // Eierkontoens e-post er låst — superadmin-rettighetene henger på selve adressen.
+  document.getElementById('profileEmailInput').disabled   = superAdmin;
+  document.getElementById('profileSaveEmailBtn').disabled = superAdmin;
+  document.getElementById('profileEmailHint').textContent = superAdmin
+    ? 'E-posten til eierkontoen er låst fordi superadmin-rettighetene er knyttet til adressen.'
+    : 'Vi sender en bekreftelseslenke til den nye adressen. E-posten byttes først når du har klikket på lenken.';
+
+  document.getElementById('profileDeleteHint').textContent = (currentUser.isAdmin && !superAdmin)
+    ? 'Kontoen din slettes for alltid — sammen med turene og stedene dine. Deltakerne beholdes, men mister koblingen til deg.'
+    : 'Kontoen din og all historikken slettes for alltid. Dette kan ikke angres.';
+
+  ['profileNameMsg', 'profileEmailMsg', 'profileDeleteMsg']
+    .forEach(id => { document.getElementById(id).style.display = 'none'; });
+
+  showScreen('profileScreen');
+}
+
+async function saveProfileName() {
+  const msg  = document.getElementById('profileNameMsg');
+  const btn  = document.getElementById('profileSaveNameBtn');
+  const name = (document.getElementById('profileNameInput').value || '').trim();
+
+  if (name.length < 2)           { showMsg(msg, 'Navnet må ha minst 2 tegn', 'amber'); return; }
+  if (name === currentUser.name) { showMsg(msg, 'Navnet er allerede lagret', 'amber'); return; }
+
+  btn.disabled = true;
+  try {
+    const { error } = await sbClient.auth.updateUser({ data: { full_name: name } });
+    if (error) throw error;
+    await invokeAccountFn({ action: 'rename', name });
+
+    currentUser.name = name;
+    updateHeaderIdentity();
+    document.getElementById('profileHeroName').textContent  = name;
+    document.getElementById('profileAvatar').textContent    = getInitials(name);
+    document.getElementById('drawerRunnerName').textContent = name;
+    showMsg(msg, 'Navnet er oppdatert', 'green');
+  } catch (e) {
+    showMsg(msg, '' + (e.message || 'Kunne ikke lagre navnet'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveProfileEmail() {
+  const msg   = document.getElementById('profileEmailMsg');
+  const btn   = document.getElementById('profileSaveEmailBtn');
+  const email = (document.getElementById('profileEmailInput').value || '').trim();
+
+  if (isSuperAdminUser()) { showMsg(msg, 'E-posten til eierkontoen kan ikke byttes herfra', 'amber'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg(msg, 'Skriv inn en gyldig e-postadresse', 'amber'); return; }
+  if (email.toLowerCase() === (currentUser.email || '').toLowerCase()) {
+    showMsg(msg, 'Dette er allerede e-posten din', 'amber'); return;
+  }
+
+  btn.disabled = true;
+  try {
+    const { error } = await sbClient.auth.updateUser({ email });
+    if (error) throw error;
+    showMsg(msg, `Bekreftelseslenke sendt til ${email}. Får du også en e-post til den gamle adressen, må begge bekreftes.`, 'green');
+  } catch (e) {
+    showMsg(msg, '' + (e.message || 'Kunne ikke endre e-posten'), 'red');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteMyAccount() {
+  const msg = document.getElementById('profileDeleteMsg');
+  const btn = document.getElementById('profileDeleteBtn');
+  const superAdmin = isSuperAdminUser();
+
+  // Eierkontoen krever at ordet skrives — den styrer hele systemet.
+  let confirmToken = null;
+  if (superAdmin) {
+    const typed = prompt('Dette er eierkontoen for TUR. Sletter du den, står systemet uten superadmin til noen registrerer seg med samme e-post igjen.\n\nSkriv SLETT for å bekrefte:');
+    if (typed === null) return;
+    if (typed.trim().toUpperCase() !== 'SLETT') { showMsg(msg, 'Avbrutt — skriv SLETT for å bekrefte', 'amber'); return; }
+    confirmToken = 'SLETT';
+  } else {
+    const extra = currentUser.isAdmin ? 'Turene og stedene dine slettes også.\n\n' : '';
+    if (!confirm(`Slette kontoen din for alltid?\n\n${extra}Dette kan ikke angres.`)) return;
+    if (!confirm('Er du helt sikker? All historikken din forsvinner.')) return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sletter…';
+  try {
+    await invokeAccountFn({ action: 'delete', confirm: confirmToken });
+
+    // Rydd opp lokalt — sesjonen er død fra nå.
+    if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    localStorage.removeItem(_cpTimesKey());
+    localStorage.removeItem(LS_TRACK);
+    localStorage.removeItem(LS_LOG);
+    localStorage.removeItem('tur_winner_seen');
+    try { await sbClient.auth.signOut({ scope: 'local' }); } catch {}
+
+    currentUser = null;
+    trackPoints = [];
+    stopPulse();
+    showSigninForm();
+    showScreen('loginScreen');
+    showToast('Kontoen din er slettet', 't-success', 5000);
+  } catch (e) {
+    showMsg(msg, '' + (e.message || 'Kunne ikke slette kontoen'), 'red');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Slett kontoen min';
+  }
+}
+
 async function startMainScreen(runner) {
-  document.getElementById('headerRaceName').textContent   = CONFIG.RACE_NAME;
-  document.getElementById('headerRunnerName').textContent = runner.name;
+  document.getElementById('headerRaceName').textContent = CONFIG.RACE_NAME;
+  updateHeaderIdentity();
 
   showScreen('mainScreen');
   initCompass();   // start tidlig så iOS-tillatelse er klar
@@ -3862,7 +4149,15 @@ async function init() {
   document.getElementById('backToSigninBtn').addEventListener('click', showSigninForm);
   document.getElementById('sendResetBtn').addEventListener('click', handleSendReset);
   document.getElementById('updatePassBtn').addEventListener('click', handleUpdatePassword);
-  document.getElementById('ikkeDegBtn').addEventListener('click', handleSignout);
+  // Profil — navnet/avataren i toppen åpner profilsiden
+  document.getElementById('profileBtn').addEventListener('click', openProfileScreen);
+  document.getElementById('profileBackBtn').addEventListener('click', returnToMainScreen);
+  document.getElementById('profileSaveNameBtn').addEventListener('click', saveProfileName);
+  document.getElementById('profileSaveEmailBtn').addEventListener('click', saveProfileEmail);
+  document.getElementById('profileSignoutBtn').addEventListener('click', handleSignout);
+  document.getElementById('profileDeleteBtn').addEventListener('click', deleteMyAccount);
+  document.getElementById('profileNameInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveProfileName(); });
+  document.getElementById('profileEmailInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveProfileEmail(); });
 
   // Enter key على حقول الإدخال
   document.getElementById('signinPassword').addEventListener('keydown', e => { if (e.key === 'Enter') handleSignin(); });
@@ -3936,6 +4231,7 @@ async function init() {
   }
 
   // تحقق من جلسة موجودة — إذا موجودة يدخل مباشرة بدون تسجيل دخول
+  const emailChangeConfirmed = window.location.hash.includes('type=email_change');
   const splash = document.getElementById('splashLoader');
   try {
     const { data: { session } } = await sbClient.auth.getSession();
@@ -3948,6 +4244,11 @@ async function init() {
     showScreen('loginScreen');
   }
   if (splash) { splash.classList.add('hide'); setTimeout(() => splash.remove(), 350); }
+
+  if (emailChangeConfirmed) {
+    history.replaceState(null, '', window.location.pathname);
+    setTimeout(() => showToast('E-postadressen din er oppdatert', 't-success', 5000), 600);
+  }
 
   // استمع لتغييرات الجلسة (logout من تبويب آخر مثلاً)
   sbClient.auth.onAuthStateChange(async (event, session) => {
