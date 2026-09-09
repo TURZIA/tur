@@ -169,7 +169,7 @@
     .btn-gray  { background: #E5E7EB; color: var(--muted); cursor: not-allowed; }
 
     /* ===== MAIN SCREEN ===== */
-    #mainScreen { gap: 0; overflow: hidden; }
+    #mainScreen { gap: 0; overflow: hidden; background: var(--green); }
 
     .app-header {
       background: linear-gradient(135deg, #0EA371 0%, #0B8A60 100%);
@@ -258,9 +258,9 @@
     /* ===== REGISTER BUTTON ===== */
     .register-wrap {
       padding: 12px 16px;
-      padding-bottom: calc(14px + var(--safe-b));
+      padding-bottom: calc(16px + var(--safe-b));
       flex-shrink: 0; background: var(--surface);
-      box-shadow: 0 -1px 0 rgba(0,0,0,0.06), 0 -4px 20px rgba(0,0,0,0.07);
+      box-shadow: 0 -1px 0 rgba(0,0,0,0.06);
       z-index: 10;
     }
     #registerBtn {
@@ -858,7 +858,7 @@
   <!-- MAP -->
   <div id="mapContainer">
     <!-- Search checkpoints -->
-    <div id="cpSearchWrap" style="position:absolute;top:10px;left:50px;right:50px;z-index:1000;">
+    <div id="cpSearchWrap" style="position:absolute;top:10px;left:50px;right:66px;z-index:1000;">
       <div style="position:relative;">
         <input id="cpSearchInput" type="text" placeholder="Søk sted..." style="width:100%;padding:9px 14px;padding-right:36px;border:1px solid var(--border);border-radius:10px;font-size:0.88rem;background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,0.12);outline:none;">
         <button id="cpSearchClear" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:1.1rem;color:var(--muted);cursor:pointer;padding:4px;">✕</button>
