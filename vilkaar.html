@@ -50,12 +50,20 @@
   ul { padding-left: 20px; }
   li { margin: 4px 0; }
   footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 0 20px 40px; }
+  .back-link {
+    display: inline-block; margin-bottom: 14px;
+    background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
+    color: #fff; text-decoration: none; border-radius: 8px;
+    padding: 7px 14px; font-size: .9rem; font-weight: 600;
+  }
+  .back-link:hover { background: rgba(255,255,255,.3); }
   .scroll { overflow-x: auto; }
 </style>
 </head>
 <body>
 
 <header>
+  <a class="back-link" id="backLink" href="index.html">← Tilbake</a>
   <h1>Brukervilkår for TUR</h1>
   <p>Gjelder appen TUR (<code>com.tur.mobile</code>) og nettversjonen. Sist oppdatert 10. september 2026.</p>
 </header>
@@ -350,6 +358,23 @@
 </main>
 
 <footer>TUR — <a href="https://turzia.github.io/tur/">turzia.github.io/tur</a></footer>
+
+<script>
+  // Lenken går til appen som standard. Kom du hit fra den andre juridiske
+  // siden, peker den dit i stedet. Ingen history.back() — siden åpnes i ny
+  // fane fra appen (tom historikk), og innholdsfortegnelsen fyller opp
+  // historikken med hopp innad på siden.
+  (function () {
+    try {
+      if (!document.referrer) return;
+      var ref = new URL(document.referrer);
+      if (ref.origin !== location.origin) return;
+      if (ref.pathname === location.pathname) return;
+      if (!/\/(vilkaar|personvern)(\.html)?$/.test(ref.pathname)) return;
+      document.getElementById("backLink").setAttribute("href", ref.pathname);
+    } catch (e) {}
+  })();
+</script>
 
 </body>
 </html>
