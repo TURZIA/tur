@@ -149,6 +149,24 @@
     }
     #loginLoading.visible { display: block; }
 
+    /* ===== SAMTYKKE OG JURIDISKE LENKER ===== */
+    .consent-row {
+      display: flex; align-items: flex-start; gap: 9px;
+      font-size: 0.82rem; color: var(--muted);
+      line-height: 1.45; cursor: pointer;
+    }
+    .consent-row input {
+      width: 18px; height: 18px; margin-top: 1px;
+      flex-shrink: 0; accent-color: var(--green);
+    }
+    .legal-links {
+      text-align: center; margin-top: 14px; font-size: 0.78rem;
+      color: var(--muted); display: flex; gap: 8px; justify-content: center;
+    }
+    .consent-row a, .legal-links a {
+      color: var(--green-dk); text-decoration: underline;
+    }
+
     /* ===== BUTTONS ===== */
     .btn {
       display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -798,11 +816,24 @@
              autocomplete="off" autocorrect="off" autocapitalize="characters" />
     </div>
     <div id="signupLoading" class="loginLoading" style="display:none;text-align:center;color:var(--muted);font-size:0.9rem;padding:8px;">Oppretter konto…</div>
+    <label class="consent-row">
+      <input type="checkbox" id="signupConsent" />
+      <span>Jeg har lest og godtar
+        <a href="vilkaar.html" target="_blank" rel="noopener">vilkårene</a> og
+        <a href="personvern.html" target="_blank" rel="noopener">personvernerklæringen</a>,
+        og samtykker til at posisjonen min lagres når jeg registrerer et besøk.</span>
+    </label>
     <button class="btn btn-green" id="signupBtn">Opprett konto</button>
     <div class="auth-toggle">
       Har du konto?
       <button class="auth-toggle-btn" id="showSigninBtn">Logg inn her</button>
     </div>
+  </div>
+
+  <div class="legal-links">
+    <a href="vilkaar.html" target="_blank" rel="noopener">Vilkår</a>
+    <span aria-hidden="true">·</span>
+    <a href="personvern.html" target="_blank" rel="noopener">Personvern</a>
   </div>
 </div>
 
@@ -2436,20 +2467,29 @@ async function registerPosition() {
 /* ============================================================
    AUTH — تسجيل دخول وإنشاء حساب عبر Supabase
    ============================================================ */
+/** Samtykket skal aldri overleve et skjemabytte — hver registrering krever et nytt. */
+function clearSignupConsent() {
+  const box = document.getElementById('signupConsent');
+  if (box) box.checked = false;
+}
+
 function showSigninForm() {
   document.getElementById('signinBox').style.display  = '';
   document.getElementById('signupBox').style.display  = 'none';
   document.getElementById('resetBox').style.display   = 'none';
+  clearSignupConsent();
 }
 function showSignupForm() {
   document.getElementById('signinBox').style.display  = 'none';
   document.getElementById('signupBox').style.display  = '';
   document.getElementById('resetBox').style.display   = 'none';
+  clearSignupConsent();
 }
 function showResetForm() {
   document.getElementById('signinBox').style.display  = 'none';
   document.getElementById('signupBox').style.display  = 'none';
   document.getElementById('resetBox').style.display   = '';
+  clearSignupConsent();
   document.getElementById('resetMsg').style.display   = 'none';
   document.getElementById('resetEmail').value         = '';
 }
@@ -2542,6 +2582,11 @@ async function handleSignup() {
   if (name.length < 2)     { showToast('Skriv inn et navn (minst 2 tegn)', 't-warn'); return; }
   if (!email)              { showToast('Skriv inn e-post', 't-warn'); return; }
   if (password.length < 6) { showToast('Passordet må ha minst 6 tegn', 't-warn'); return; }
+
+  if (!document.getElementById('signupConsent').checked) {
+    showToast('Du må godta vilkårene og personvernerklæringen for å opprette konto', 't-warn');
+    return;
+  }
 
   // Check if this email is super admin or already registered as an admin — no code needed
   const isSuperAdmin = email.toLowerCase() === CONFIG.ADMIN_EMAIL.toLowerCase();
