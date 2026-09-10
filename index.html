@@ -2820,7 +2820,8 @@ async function saveProfileEmail() {
 
   btn.disabled = true;
   try {
-    const { error } = await sbClient.auth.updateUser({ email });
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await sbClient.auth.updateUser({ email }, { emailRedirectTo: redirectTo });
     if (error) throw error;
     showMsg(msg, `Bekreftelseslenke sendt til ${email}. Får du også en e-post til den gamle adressen, må begge bekreftes.`, 'green');
   } catch (e) {
@@ -4108,6 +4109,10 @@ async function refreshCurrentScreen() {
     await loadLøpereList();
   } else if (active === 'superAdminScreen') {
     await renderAdminList();
+  } else if (active === 'cpNewRaceScreen') {
+    await renderNRRacesList();
+  } else if (active === 'profileScreen') {
+    openProfileScreen();
   } else if (active === 'rapportScreen') {
     // لا شيء — المستخدم يضغط الزر بنفسه
   }

@@ -83,9 +83,14 @@ async function deleteAccount(db: SupabaseClient, uid: string, email: string) {
     await db.from('admins').delete().eq('id', adminRow.id);
   }
 
-  // 2) Brukerens egne data.
+  // 2) Brukerens egne data. Vinnerraden beholdes — den er det som hindrer at
+  //    det trekkes to vinnere for samme måned — men navnet fjernes, slik
+  //    personvernerklæringen punkt 10 lover.
   await db.from('check_ins').delete().eq('runner_id', uid);
-  await db.from('winners').delete().eq('winner_id', uid);
+  await db
+    .from('winners')
+    .update({ winner_name: 'Slettet bruker', winner_id: null })
+    .eq('winner_id', uid);
   await db.from('runners').delete().eq('id', uid);
 
   // 3) Selve kontoen.

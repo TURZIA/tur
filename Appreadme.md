@@ -137,7 +137,7 @@ Free-to-use community platform for monthly walking challenges. Organized by admi
 - **Layout**: Vertical flex — Header → GPS Bar → Map → Register Button
 
   **Header** (`.app-header`):
-  - Row 1: "TUR" label + progress badge (X/Y) | Runner name + "Ikke deg?" logout link
+  - Row 1: "TUR" label + progress badge (X/Y) | Runner name + avatar (initials) — tap either to open Profile Screen
   - Row 2: Navigation buttons (conditional visibility):
     - "Historikk" — all users except super admin
     - "Status" — super admin only
@@ -337,6 +337,41 @@ Free-to-use community platform for monthly walking challenges. Organized by admi
   - "Koble til" button (green)
   - Error messages inline
 
+#### SCR-015: Profile Screen (Min profil)
+- **Purpose**: Let any signed-in user manage their own account
+- **ID**: `#profileScreen`
+- **Entry**: Tap the runner name or avatar in the main header (`#profileBtn`)
+- **Exit**: "← Tilbake" → Main Screen
+- **Available to**: runners, admins and super admin alike
+
+  **Hero** (`.profile-hero`):
+  - Large avatar with initials, name, e-mail
+  - Role badge: "Deltaker" / "Arrangør" / "Superadmin" (purple)
+
+  **Navn card**:
+  - Text input + "Lagre navn"
+  - Writes to auth metadata, `runners.name`, and propagates to `check_ins.runner_name`
+    and `winners.winner_name` via the `account` edge function, so reports keep matching
+  - Validation: ≥2 chars, max 60
+
+  **E-post card**:
+  - E-mail input + "Endre e-post"
+  - Sends a confirmation link (`emailRedirectTo` = current app URL); the address only
+    changes once the link is clicked, then `runners.email` / `admins.email` are mirrored
+    on next login
+  - **Locked for super admin** — the address is hardcoded in `CONFIG.ADMIN_EMAIL` and in
+    the RLS policies, so changing it from the app would strip the owner of their rights
+
+  **Økt card**: "Logg ut" (outline button) — replaces the old "Ikke deg?" header link
+
+  **Faresone card**:
+  - "Slett kontoen min" (red)
+  - Runner: two confirm dialogs. Super admin: must type `SLETT`, enforced in the UI
+    *and* in the edge function
+  - Deletes check-ins, runner row and the auth user; winner rows are kept but the name
+    is cleared. For an admin it also deletes their races and checkpoints and unlinks
+    their participants
+
 ### Global UI Elements
 
 #### Offline Banner (`#offlineBanner`)
@@ -531,6 +566,7 @@ winners (standalone, references admin_code)
 | id | UUID | PK, auto | Primary key |
 | email | TEXT | NOT NULL, UNIQUE | Admin email address |
 | admin_code | VARCHAR(6) | NOT NULL, UNIQUE | 6-char alphanumeric code (ABCDEFGHJKLMNPQRSTUVWXYZ23456789) |
+| user_id | UUID | UNIQUE (partial, nullable) | `auth.users.id`. Bound on first login; keeps admin rights stable across e-mail changes |
 | is_active | BOOLEAN | DEFAULT true | Soft delete flag |
 | created_at | TIMESTAMPTZ | DEFAULT now() | Creation timestamp |
 
