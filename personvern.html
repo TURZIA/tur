@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Personvernerklæring — TUR</title>
+<style>
+  :root {
+    --green: #0EA371;
+    --green-dk: #0B7D57;
+    --text: #1F2937;
+    --muted: #6B7280;
+    --border: #E5E7EB;
+    --bg: #F5F7FA;
+    --surface: #FFFFFF;
+    --amber-bg: #FEF3C7;
+    --amber-tx: #92400E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+  }
+  header {
+    background: linear-gradient(135deg, var(--green), var(--green-dk));
+    color: #fff; padding: 34px 20px;
+  }
+  header h1 { margin: 0 0 6px; font-size: 1.6rem; }
+  header p { margin: 0; opacity: .92; font-size: .95rem; }
+  main { max-width: 780px; margin: 0 auto; padding: 24px 20px 64px; }
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 16px;
+  }
+  nav.toc ol { margin: 8px 0 0; padding-left: 20px; font-size: .93rem; }
+  nav.toc li { margin: 3px 0; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 16px;
+  }
+  h2 { font-size: 1.08rem; margin: 0 0 10px; color: var(--green-dk); }
+  h3 { font-size: .96rem; margin: 16px 0 6px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td {
+    text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border);
+    font-size: .92rem; vertical-align: top;
+  }
+  th { color: var(--muted); font-weight: 600; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: .88em; }
+  a { color: var(--green-dk); }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+  footer { color: var(--muted); font-size: .85rem; text-align: center; padding: 0 20px 40px; }
+  .scroll { overflow-x: auto; }
+  .todo {
+    background: var(--amber-bg); color: var(--amber-tx);
+    padding: 2px 8px; border-radius: 5px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Personvernerklæring for TUR</h1>
+  <p>Gjelder appen TUR (<code>com.tur.mobile</code>) og nettversjonen. Sist oppdatert 9. september 2026.</p>
+</header>
+
+<main>
+
+<nav class="toc">
+  <strong>Innhold</strong>
+  <ol>
+    <li><a href="#kort">Kort fortalt</a></li>
+    <li><a href="#lukket">Hvem tjenesten er for</a></li>
+    <li><a href="#ansvarlig">Behandlingsansvarlig og kontakt</a></li>
+    <li><a href="#opplysninger">Hvilke opplysninger vi behandler</a></li>
+    <li><a href="#grunnlag">Rettslig grunnlag</a></li>
+    <li><a href="#posisjon">Om posisjonen din</a></li>
+    <li><a href="#hvor">Hvor opplysningene lagres</a></li>
+    <li><a href="#deling">Hvem opplysningene deles med</a></li>
+    <li><a href="#enheten">Det som lagres på enheten din</a></li>
+    <li><a href="#lagringstid">Hvor lenge vi lagrer</a></li>
+    <li><a href="#sikkerhet">Sikkerhet</a></li>
+    <li><a href="#profilering">Ingen profilering, annonser eller salg</a></li>
+    <li><a href="#barn">Barn</a></li>
+    <li><a href="#rettigheter">Rettighetene dine</a></li>
+    <li><a href="#sletting">Slik sletter du kontoen din</a></li>
+    <li><a href="#klage">Klage</a></li>
+    <li><a href="#endringer">Endringer</a></li>
+  </ol>
+</nav>
+
+<section id="kort">
+  <h2>1. Kort fortalt</h2>
+  <p>
+    TUR er en app for turregistrering. Du velger et tursted, går dit, og
+    registrerer at du var der. For at det skal virke må appen vite hvor du er
+    i det øyeblikket du trykker <em>Registrer posisjon</em> — og det stedet
+    lagres sammen med navnet ditt, slik at arrangøren kan se at du var framme.
+  </p>
+  <ul>
+    <li>Posisjonen leses <strong>bare mens appen er åpen på skjermen</strong>.</li>
+    <li>Appen har <strong>ingen bakgrunnssporing</strong> og ber ikke om tillatelse til det.</li>
+    <li>Opplysningene lagres <strong>innenfor EØS</strong> (Frankfurt, Tyskland).</li>
+    <li>Vi selger ingenting videre, viser ingen annonser og driver ingen profilering.</li>
+  </ul>
+</section>
+
+<section id="lukket">
+  <h2>2. Hvem tjenesten er for</h2>
+  <p>
+    TUR er en lukket tjeneste for avgrensede grupper — ikke en åpen
+    publikumstjeneste, og ikke noe man bare kan melde seg inn i.
+  </p>
+  <ul>
+    <li>
+      For å registrere deg som deltaker må du oppgi en <strong>deltakerkode</strong>
+      du har fått av en arrangør. Uten en gyldig kode blir kontoen ikke
+      opprettet — appen stopper registreringen.
+    </li>
+    <li>
+      Koden avgjør hvilken arrangør du knyttes til, og dermed hvilken tur du
+      deltar i og hvem som ser registreringene dine.
+    </li>
+    <li>
+      Arrangøren bestemmer selv hvem koden deles med. Vi verver ingen
+      deltakere, og tjenesten markedsføres ikke mot allmennheten.
+    </li>
+  </ul>
+  <h3>Hvem som har ansvar for hva</h3>
+  <ul>
+    <li>
+      <strong>Behandlingsansvarlig for tjenesten</strong> er den som er oppgitt
+      i punkt 3. Ansvaret gjelder hvordan appen samler inn, lagrer og sikrer
+      opplysningene.
+    </li>
+    <li>
+      <strong>Arrangøren</strong> velger hvem som får deltakerkoden, oppretter
+      turene, og ser rapporten for sin egen tur. Arrangøren svarer selv for
+      hvordan opplysningene brukes videre etter at de er sett eller lastet ned
+      — for eksempel en rapport som sendes eller lagres utenfor appen.
+    </li>
+    <li>
+      Deler du deltakerkoden din videre, får den du deler med tilgang til å
+      registrere seg hos den samme arrangøren. Koden bør derfor behandles som
+      en invitasjon, ikke som noe offentlig.
+    </li>
+  </ul>
+  <p>
+    At tjenesten er lukket, endrer ikke rettighetene dine etter
+    personvernforordningen. De gjelder fullt ut, uansett hvor mange som bruker
+    appen.
+  </p>
+</section>
+
+<section id="ansvarlig">
+  <h2>3. Behandlingsansvarlig og kontakt</h2>
+  <p>
+    Behandlingsansvarlig er <strong>Ziad Nasif</strong>, som privatperson.
+  </p>
+  <p>
+    Kontakt for spørsmål om personvern, innsyn, retting og sletting:
+    <a href="mailto:Rivoosy@gmail.com">Rivoosy@gmail.com</a>
+  </p>
+  <p>
+    Vi svarer uten ugrunnet opphold, og normalt innen én måned. Er saken
+    kompleks, kan fristen forlenges, og da sier vi fra.
+  </p>
+</section>
+
+<section id="opplysninger">
+  <h2>4. Hvilke opplysninger vi behandler</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>Opplysning</th><th>Når den samles inn</th><th>Hvorfor</th></tr>
+    <tr>
+      <td>Navn</td>
+      <td>Når du registrerer deg</td>
+      <td>Å vise hvem som har besøkt et sted, og hvem som vinner trekningen</td>
+    </tr>
+    <tr>
+      <td>E-postadresse</td>
+      <td>Når du registrerer deg og logger inn</td>
+      <td>Innlogging, tilbakestilling av passord, og å koble deg til arrangøren din</td>
+    </tr>
+    <tr>
+      <td>Passord</td>
+      <td>Ved registrering</td>
+      <td>Behandles av autentiseringstjenesten vår og lagres ikke i klartekst</td>
+    </tr>
+    <tr>
+      <td>Breddegrad og lengdegrad</td>
+      <td>Løpende mens appen er åpen, og lagret i det øyeblikket du registrerer et besøk</td>
+      <td>Vise deg på kartet, måle avstand til nærmeste sted, og bekrefte besøket</td>
+    </tr>
+    <tr>
+      <td>GPS-nøyaktighet i meter</td>
+      <td>Sammen med besøket</td>
+      <td>Å vurdere hvor pålitelig registreringen er</td>
+    </tr>
+    <tr>
+      <td>Tidspunkt for besøket</td>
+      <td>Ved registrering</td>
+      <td>Historikk og rapport</td>
+    </tr>
+    <tr>
+      <td>Tid siden forrige sted</td>
+      <td>Ved registrering</td>
+      <td>Rapporten til arrangøren</td>
+    </tr>
+    <tr>
+      <td>Hvilken tur og hvilket sted besøket gjelder</td>
+      <td>Ved registrering</td>
+      <td>Å knytte besøket til riktig tur</td>
+    </tr>
+    <tr>
+      <td>Navn på vinner, med måned og år</td>
+      <td>Når arrangøren trekker en vinner</td>
+      <td>Å sikre at det trekkes én vinner per måned per arrangør</td>
+    </tr>
+    <tr>
+      <td>IP-adresse og tekniske logger</td>
+      <td>Ved hvert kall mot tjenestene</td>
+      <td>Driftssikkerhet og feilsøking hos leverandørene våre</td>
+    </tr>
+  </table>
+  </div>
+  <p>
+    Vi samler ikke inn kontakter, bilder, filer, kalender, mikrofon, kamera,
+    reklameidentifikator eller helseopplysninger. Appen ber ikke om tilgang til
+    noe av dette.
+  </p>
+</section>
+
+<section id="grunnlag">
+  <h2>5. Rettslig grunnlag</h2>
+  <p>
+    Behandlingen bygger på personvernforordningen (GDPR) artikkel 6:
+  </p>
+  <div class="scroll">
+  <table>
+    <tr><th>Formål</th><th>Grunnlag</th></tr>
+    <tr>
+      <td>Konto, innlogging og det å levere selve tjenesten</td>
+      <td>Artikkel 6 nr. 1 bokstav b — nødvendig for å oppfylle avtalen med deg</td>
+    </tr>
+    <tr>
+      <td>Registrering av besøk, med posisjon og tidspunkt</td>
+      <td>Artikkel 6 nr. 1 bokstav b — dette <em>er</em> tjenesten du har bedt om</td>
+    </tr>
+    <tr>
+      <td>Rapport til arrangøren av turen din</td>
+      <td>Artikkel 6 nr. 1 bokstav b</td>
+    </tr>
+    <tr>
+      <td>Månedlig trekning blant dem som har besøkt alle stedene</td>
+      <td>Artikkel 6 nr. 1 bokstav b</td>
+    </tr>
+    <tr>
+      <td>Drift, sikkerhet og feilsøking</td>
+      <td>Artikkel 6 nr. 1 bokstav f — berettiget interesse i at tjenesten virker og ikke misbrukes</td>
+    </tr>
+  </table>
+  </div>
+  <p>
+    I tillegg må du gi appen tillatelse til posisjon i operativsystemet. Den
+    tillatelsen kan du når som helst trekke tilbake i innstillingene på
+    telefonen, uavhengig av det rettslige grunnlaget over.
+  </p>
+</section>
+
+<section id="posisjon">
+  <h2>6. Om posisjonen din</h2>
+  <ul>
+    <li>
+      Appen ber om <em>presis posisjon mens appen er i bruk</em>. Den ber
+      ikke om posisjon i bakgrunnen, og kan ikke lese posisjonen din når
+      appen er lukket.
+    </li>
+    <li>
+      Posisjonen vises på kartet mens du bruker appen. Den blir bare
+      <strong>lagret</strong> når du selv trykker <em>Registrer posisjon</em>.
+    </li>
+    <li>
+      Sier du nei til posisjon, kan du fortsatt logge inn og se historikken
+      din, men du kan ikke registrere besøk — appen har da ingen måte å
+      bekrefte at du var på stedet.
+    </li>
+    <li>
+      Du kan trekke tilbake tillatelsen når som helst:
+      <em>Innstillinger → Apper → TUR → Tillatelser → Posisjon</em>.
+    </li>
+  </ul>
+</section>
+
+<section id="hvor">
+  <h2>7. Hvor opplysningene lagres</h2>
+  <p>
+    Opplysningene lagres hos <strong>Supabase</strong> i regionen
+    <code>eu-central-1</code> — Frankfurt i Tyskland. Det er
+    <strong>innenfor EØS</strong>, og for denne lagringen skjer det derfor
+    ingen overføring til land utenfor EØS.
+  </p>
+  <p>
+    Ett unntak: velger en arrangør å sende rapporten på e-post, går den
+    gjennom <strong>EmailJS</strong>, som er etablert utenfor EØS. Da overføres
+    innholdet i rapporten — navn, sted, dato og klokkeslett — til et
+    tredjeland. Denne funksjonen brukes bare av arrangører, ikke av vanlige
+    deltakere.
+  </p>
+  <p>
+    Karttjenestene under mottar ikke kontoopplysningene dine, men de ser
+    IP-adressen din, og noen av dem kan ligge utenfor EØS.
+  </p>
+</section>
+
+<section id="deling">
+  <h2>8. Hvem opplysningene deles med</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>Mottaker</th><th>Hva den mottar</th><th>Rolle</th></tr>
+    <tr>
+      <td>Supabase</td>
+      <td>Alle lagrede opplysninger — konto, besøk, posisjoner, vinnere</td>
+      <td>Databehandler</td>
+    </tr>
+    <tr>
+      <td>Arrangøren av turen din</td>
+      <td>Navnet ditt, hvilke steder du har besøkt, tidspunkt, og posisjonen som ble registrert</td>
+      <td>Ser rapporten for sin egen tur</td>
+    </tr>
+    <tr>
+      <td>EmailJS</td>
+      <td>Rapporten, når en arrangør velger å sende den på e-post</td>
+      <td>Databehandler, utenfor EØS</td>
+    </tr>
+    <tr>
+      <td>OpenFreeMap og OpenStreetMap</td>
+      <td>IP-adresse og hvilket kartutsnitt som vises</td>
+      <td>Leverer kartbildene</td>
+    </tr>
+    <tr>
+      <td>OSRM (<code>routing.openstreetmap.de</code>)</td>
+      <td>Posisjonen din og stedet du går mot, for å beregne ruten</td>
+      <td>Ruteberegning</td>
+    </tr>
+    <tr>
+      <td>Nominatim og Geonorge (Kartverket)</td>
+      <td>Søketeksten du skriver i stedssøket</td>
+      <td>Stedssøk</td>
+    </tr>
+  </table>
+  </div>
+  <p>
+    Utover dette utleverer vi ikke opplysninger, med mindre vi er rettslig
+    forpliktet til det.
+  </p>
+</section>
+
+<section id="enheten">
+  <h2>9. Det som lagres på enheten din</h2>
+  <p>
+    Appen lagrer lokalt på telefonen din: innloggingsøkten (så du slipper å
+    logge inn hver gang), sporet av hvor du har gått mens appen var åpen, de
+    siste registreringene dine med posisjon og tidspunkt, og når hvert sted sist
+    ble registrert. Dette ligger i appens eget lagringsområde og sendes ikke
+    videre.
+  </p>
+  <p>
+    Logger du ut, slettes sporet, de lagrede registreringene og
+    tidspunktene fra telefonen. Avinstallerer du appen, fjernes alt sammen.
+  </p>
+  <p>
+    Excel-rapporten en arrangør laster ned, skrives til appens midlertidige
+    mappe på telefonen og deles videre bare hvis arrangøren selv velger det.
+  </p>
+  <p>Appen bruker ingen informasjonskapsler til sporing.</p>
+</section>
+
+<section id="lagringstid">
+  <h2>10. Hvor lenge vi lagrer</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>Opplysning</th><th>Lagringstid</th></tr>
+    <tr>
+      <td>Konto — navn og e-post</td>
+      <td>Så lenge du har en konto. Slettes når du ber om det.</td>
+    </tr>
+    <tr>
+      <td>Registrerte besøk med posisjon</td>
+      <td>Så lenge kontoen finnes — de er selve turhistorikken din og grunnlaget for trekningen. Slettes sammen med kontoen.</td>
+    </tr>
+    <tr>
+      <td>Vinnere</td>
+      <td>Beholdes for å hindre at det trekkes to vinnere for samme måned. Navnet fjernes ved sletting av konto.</td>
+    </tr>
+    <tr>
+      <td>Tekniske logger</td>
+      <td>Kortvarig, etter leverandørens rutiner</td>
+    </tr>
+  </table>
+  </div>
+</section>
+
+<section id="sikkerhet">
+  <h2>11. Sikkerhet</h2>
+  <ul>
+    <li>All trafikk mellom appen og tjenestene går kryptert over HTTPS.</li>
+    <li>Passord lagres ikke i klartekst.</li>
+    <li>
+      Databasen bruker tilgangsregler på radnivå, slik at en arrangør bare får
+      se deltakerne og besøkene som hører til sine egne turer.
+    </li>
+    <li>Opplysningene ligger kryptert hos leverandøren.</li>
+  </ul>
+  <p>
+    Ingen løsning er helt sikker. Er et brudd på personopplysningssikkerheten
+    meldepliktig, melder vi det til Datatilsynet uten ugrunnet opphold og, når
+    det er mulig, innen 72 timer etter at vi ble kjent med det. Medfører
+    bruddet høy risiko for deg, varsler vi deg direkte.
+  </p>
+</section>
+
+<section id="profilering">
+  <h2>12. Ingen profilering, annonser eller salg</h2>
+  <ul>
+    <li>Vi selger ikke opplysninger til noen.</li>
+    <li>Vi viser ingen annonser, og deler ingenting med annonsenettverk.</li>
+    <li>Appen inneholder ingen sporingsverktøy eller analyseverktøy fra tredjepart.</li>
+    <li>
+      Det treffes ingen automatiserte avgjørelser med rettsvirkning for deg.
+      Den månedlige trekningen er tilfeldig blant dem som har besøkt alle
+      stedene, og påvirker ingen rettigheter.
+    </li>
+  </ul>
+</section>
+
+<section id="barn">
+  <h2>13. Barn</h2>
+  <p>
+    TUR er laget for turdeltakere generelt, retter seg ikke mot barn under 13
+    år, og vi oppfordrer ikke barn under denne alderen til å opprette egen
+    konto. Behandlingen bygger på avtalen om å levere tjenesten, ikke på
+    samtykke, så vi ber ikke om samtykke fra foresatte. Mener du at et barn har
+    opprettet konto uten at det var meningen, ta kontakt, så sletter vi den.
+  </p>
+</section>
+
+<section id="rettigheter">
+  <h2>14. Rettighetene dine</h2>
+  <p>Etter personvernforordningen har du rett til å:</p>
+  <ul>
+    <li><strong>Få innsyn</strong> i hvilke opplysninger vi har om deg</li>
+    <li><strong>Få rettet</strong> opplysninger som er feil eller ufullstendige</li>
+    <li><strong>Få slettet</strong> opplysningene dine</li>
+    <li><strong>Kreve begrenset behandling</strong> mens en innsigelse behandles</li>
+    <li>
+      <strong>Protestere</strong> mot behandling vi bygger på berettiget
+      interesse
+    </li>
+    <li>
+      <strong>Få opplysningene utlevert</strong> i et maskinlesbart format, og
+      overført til en annen tjeneste (dataportabilitet)
+    </li>
+    <li>
+      <strong>Trekke tilbake posisjonstillatelsen</strong> når som helst i
+      innstillingene på telefonen
+    </li>
+  </ul>
+  <p>
+    Ta kontakt på adressen i punkt 3. Vi kan be deg bekrefte identiteten din
+    før vi utleverer eller sletter opplysninger, slik at ingen andre kan be om
+    dem på dine vegne. Det er gratis å bruke rettighetene dine.
+  </p>
+</section>
+
+<section id="sletting">
+  <h2>15. Slik sletter du kontoen din</h2>
+  <p>Du sletter kontoen selv, uten å måtte be oss om det:</p>
+  <h3>I appen</h3>
+  <p>
+    Trykk på navnet ditt øverst til høyre → <strong>Min profil</strong> →
+    <strong>Faresone</strong> → <strong>Slett kontoen min</strong>.
+  </p>
+  <h3>Fra nettleseren</h3>
+  <p>
+    Gå til <a href="https://turzia.github.io/tur/">turzia.github.io/tur</a>,
+    logg inn, og velg <strong>Min profil</strong> →
+    <strong>Slett kontoen min</strong>. Du trenger altså ikke ha appen
+    installert for å slette kontoen.
+  </p>
+  <h3>Hva som slettes</h3>
+  <ul>
+    <li>innloggingskontoen din</li>
+    <li>navnet og e-postadressen din</li>
+    <li>alle registrerte besøk, med posisjon og tidspunkt</li>
+    <li>eventuelle vinneroppføringer på deg</li>
+    <li>det appen hadde lagret lokalt på telefonen</li>
+  </ul>
+  <p>
+    Er du arrangør, slettes også turene og stedene du har opprettet.
+    Deltakerne dine beholder kontoene sine, men mister koblingen til deg.
+  </p>
+  <p>
+    Sletting skjer med én gang, er endelig, og kan ikke angres. Rapporter en
+    arrangør allerede har sendt på e-post, ligger utenfor systemet vårt og
+    omfattes ikke.
+  </p>
+</section>
+
+<section id="klage">
+  <h2>16. Klage</h2>
+  <p>
+    Mener du at vi behandler opplysninger om deg i strid med regelverket, vil
+    vi gjerne høre fra deg først. Du har uansett rett til å klage til
+    <a href="https://www.datatilsynet.no/">Datatilsynet</a>.
+  </p>
+</section>
+
+<section id="endringer">
+  <h2>17. Endringer</h2>
+  <p>
+    Endrer vi denne erklæringen, oppdaterer vi datoen øverst på siden. Er
+    endringen vesentlig, varsler vi i appen.
+  </p>
+</section>
+
+</main>
+
+<footer>TUR — <a href="https://turzia.github.io/tur/">turzia.github.io/tur</a></footer>
+
+</body>
+</html>
